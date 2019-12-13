@@ -5,12 +5,13 @@ using System.Collections.Concurrent;
 
 namespace tws2uni
 {
-    public class BackgroundTaskQueue : IBackgroundTaskQueue<Func<CancellationToken, Task>>
+    using tws;
+    public class BackgroundTickQueue : IBackgroundTaskQueue<TwsTick>
     {
-        private readonly ConcurrentQueue<Func<CancellationToken, Task>> workItems = new ConcurrentQueue<Func<CancellationToken, Task>>();
+        private readonly ConcurrentQueue<TwsTick> workItems = new ConcurrentQueue<TwsTick>();
         private readonly SemaphoreSlim signal = new SemaphoreSlim(0);
 
-        public void QueueBackgroundWorkItem(Func<CancellationToken, Task> workItem)
+        public void QueueBackgroundWorkItem(TwsTick workItem)
         {
             if (workItem == null)
             {
@@ -21,7 +22,7 @@ namespace tws2uni
             signal.Release();
         }
 
-        public async Task<Func<CancellationToken, Task>> DequeueAsync(CancellationToken cancellationToken)
+        public async Task<TwsTick> DequeueAsync(CancellationToken cancellationToken)
         {
             await signal.WaitAsync(cancellationToken);
             workItems.TryDequeue(out var workItem);

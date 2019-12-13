@@ -10,13 +10,13 @@ namespace tws2uni
     {
         private readonly ILogger logger;
 
-        public QueuedHostedService(IBackgroundTaskQueue taskQueue, ILoggerFactory loggerFactory)
+        public QueuedHostedService(IBackgroundTaskQueue<Func<CancellationToken, Task>> taskQueue, ILoggerFactory loggerFactory)
         {
             TaskQueue = taskQueue;
             logger = loggerFactory.CreateLogger<QueuedHostedService>();
         }
 
-        public IBackgroundTaskQueue TaskQueue { get; }
+        public IBackgroundTaskQueue<Func<CancellationToken, Task>> TaskQueue { get; }
 
         protected async override Task ExecuteAsync(CancellationToken cancellationToken)
         {

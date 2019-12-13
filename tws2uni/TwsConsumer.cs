@@ -3,36 +3,43 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using IBApi;
+using Microsoft.Extensions.Options;
+using System.Reactive.Linq;
 
 namespace tws2uni
 {
     using tws;
     class TwsConsumer : BackgroundService
     {
-        public TwsConsumer(IRealTimeDataProvider realTimeDataProvider, IBackgroundTaskQueue queue, ILoggerFactory loggerFactory)
+        public TwsConsumer(IOptions<TwsOption> option, IRealTimeDataProvider provider, ILoggerFactory loggerFactory)
         {
-            this.queue = queue;
+            this.option = option.Value;
+            this.provider = provider;
             this.logger = loggerFactory.CreateLogger<TwsConsumer>();
-            this.realTimeDataProvider = realTimeDataProvider;
         }
 
-        private readonly IBackgroundTaskQueue queue;
+        private readonly TwsOption option;
+        private readonly IRealTimeDataProvider provider;
         private readonly ILogger logger;
-        private readonly IRealTimeDataProvider realTimeDataProvider;
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            stoppingToken.Register(() => logger.LogInformation($"Stopping"));
+            var contracts = option.Contracts;
+
+            stoppingToken.Register(() =>
+            {
+                logger.LogInformation("Stoping...");
+                provider.Disconnect();
+                logger.LogInformation("Stoped");
+            });
+
+            provider.Connect(option.Host, option.Port, option.ClientID, autoReconnect: true);
+
+            foreach (var contract in contracts)
+                provider.SubscribeTickByTick(contract);
 
             while (!stoppingToken.IsCancellationRequested)
             {
-                queue.QueueBackgroundWorkItem(async token =>
-                {
-                    await Task.Delay(TimeSpan.FromSeconds(5), token);
-                });
-                logger.LogInformation($"Added new task. all tasks: {queue.CountTask()}");
-
                 await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
             }
         }

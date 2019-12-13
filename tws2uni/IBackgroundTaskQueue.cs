@@ -4,11 +4,11 @@ using System.Threading.Tasks;
 
 namespace tws2uni
 {
-    public interface IBackgroundTaskQueue
+    public interface IBackgroundTaskQueue<T>
     {
-        void QueueBackgroundWorkItem(Func<CancellationToken, Task> workItem);
+        void QueueBackgroundWorkItem(T workItem);
 
-        Task<Func<CancellationToken, Task>> DequeueAsync(CancellationToken cancellationToken);
+        Task<T> DequeueAsync(CancellationToken cancellationToken);
 
         int CountTask();
     }

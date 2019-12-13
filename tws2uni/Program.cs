@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,10 +14,12 @@ namespace tws2uni
         public static async Task Main(string[] args)
         {
             var host = new HostBuilder()
+                
                 .ConfigureAppConfiguration((hostContext, config) =>
                 {
+                    config.SetBasePath(Directory.GetCurrentDirectory()); Console.WriteLine(Directory.GetCurrentDirectory());
                     config.AddEnvironmentVariables();
-                    config.AddJsonFile("appsettings.json", optional: true);
+                    config.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
                     config.AddCommandLine(args);
                 })
                 .ConfigureLogging(logging =>
@@ -29,10 +32,14 @@ namespace tws2uni
                 .ConfigureServices((hostContext, services) =>
                 {
                     services.AddOptions();
-                    services.AddSingleton<IBackgroundTaskQueue, BackgroundTaskQueue>();
+
+                    services.Configure<TwsOption>(option => hostContext.Configuration.GetSection("tws").Bind(option));
+
+                    services.AddSingleton<IBackgroundTaskQueue<TwsTick>, BackgroundTickQueue>();
                     services.AddSingleton<IRealTimeDataProvider, RealTimeDataProvider>();
-                    services.AddHostedService<QueuedHostedService>();
+
                     services.AddHostedService<TwsConsumer>();
+                    services.AddHostedService<UniFeedConsumer>();
                 })
                 .Build();
 

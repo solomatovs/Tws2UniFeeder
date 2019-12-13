@@ -1,82 +1,73 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using IBApi;
 
 namespace tws2uni.tws
 {
     class RealTimeDataProvider : IRealTimeDataProvider
     {
-        private readonly EReader reader;
-        private readonly EClientSocket clientSocket;
-        private readonly EReaderSignal readerSignal;
-        private readonly ConcurrentDictionary<string, int> requestIdsBySymbol = new ConcurrentDictionary<string, int>();
-        public RealTimeDataProvider()
+        private readonly ILogger logger;
+        private readonly EWrapperImpl wrapper;
+        private readonly ConcurrentDictionary<Contract, int> requestIdsBySymbol = new ConcurrentDictionary<Contract, int>(new ContractEqualityComparer());
+        public RealTimeDataProvider(IBackgroundTaskQueue<TwsTick> queue, ILoggerFactory loggerFactory)
         {
-            var wrapper = new EWrapperImpl();
-            this.clientSocket = wrapper.ClientSocket;
-            this.readerSignal = wrapper.Signal;
-            this.reader = new EReader(wrapper.ClientSocket, wrapper.Signal);
+            this.logger = loggerFactory.CreateLogger<RealTimeDataProvider>();
+            this.wrapper = new EWrapperImpl(queue, requestIdsBySymbol, loggerFactory);
         }
-        public void Connect(string host, int port, int clientId)
+
+        public Action Disconnecting = null;
+
+        public void Connect(string host, int port, int clientId, bool autoReconnect = true)
+        {
+            VConnect(host, port, clientId);
+
+            if (autoReconnect)
+                Disconnecting = () => VConnect(host, port, clientId);
+        }
+
+        private void VConnect(string host, int port, int clientId)
         {
             try
             {
-                clientSocket.eConnect(host, port, clientId);
-
-                var reader = new EReader(clientSocket, readerSignal);
+                wrapper.ClientSocket.eConnect(host, port, clientId);
+                var reader = new EReader(wrapper.ClientSocket, wrapper.signal);
                 reader.Start();
-                //Once the messages are in the queue, an additional thread can be created to fetch them
-                new Thread(() =>
-                {
-                    while (clientSocket.IsConnected())
-                    {
-                        readerSignal.waitForSignal();
-                        reader.processMsgs();
-                    }
-                })
-                { IsBackground = true }.Start();
+                StartLoopProcessMsgs(reader);
             }
             catch (Exception e)
             {
-                Console.WriteLine(e);
+                logger.LogError(e.Message);
                 throw;
             }
         }
 
-        public Task ConnectAsync(string host, int port, int clientId)
+        private void StartLoopProcessMsgs(EReader reader)
         {
-            var ct = new CancellationTokenSource(DefaultTimeoutMs);
-            var res = new TaskCompletionSource<object>();
-            ct.Token.Register(() => res.TrySetCanceled(), false);
-
-            EventHandler connectAck = (sender, args) =>
+            new Thread(() =>
             {
-                res.SetResult(new object());
-            };
-
-            EventDispatcher.ConnectAck += connectAck;
-
-            Connect(host, port, clientId);
-
-            res.Task.ContinueWith(x =>
-            {
-                EventDispatcher.ConnectAck -= connectAck;
-
-            }, TaskContinuationOptions.None);
-
-            return res.Task;
+                while (wrapper.ClientSocket.IsConnected())
+                {
+                    wrapper.signal.waitForSignal();
+                    reader.processMsgs();
+                }
+            })
+            { IsBackground = true }.Start();
         }
 
         public void Disconnect()
         {
             try
             {
-                ClientSocket.eDisconnect();
+                requestIdsBySymbol.Clear();
+                Disconnecting = null;
+                wrapper.ClientSocket.eDisconnect();
             }
             catch (Exception e)
             {
-                Console.WriteLine(e);
+                logger.LogError(e.Message);
                 throw;
             }
         }
@@ -84,14 +75,22 @@ namespace tws2uni.tws
         public void SubscribeTickByTick(Contract symbol)
         {
             var request = new Random().Next();
-            ClientSocket.reqMktData(request, symbol, string.Empty, false, false, null);
-
-            throw new NotImplementedException();
+            wrapper.ClientSocket.reqTickByTickData(request, symbol, "BidAsk", 0, false);
+            while (!requestIdsBySymbol.TryAdd(symbol, request)) { }
         }
 
         public void UnSubscribeTickByTick(Contract symbol)
         {
-            throw new NotImplementedException();
+            requestIdsBySymbol.TryRemove(symbol, out int request);
+            try
+            {
+                wrapper.ClientSocket.cancelTickByTickData(request);
+            }
+            catch
+            {
+                while (!requestIdsBySymbol.TryAdd(symbol, request)) { }
+                throw;
+            }
         }
     }
 }
