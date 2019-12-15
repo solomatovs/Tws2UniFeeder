@@ -18,8 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\..\Downloads\ibapi-master\source\csharpclient\client\CSharpAPI.csproj" />
-    <ProjectReference Include="..\..\InterReact\InterReact\InterReact.csproj" />
+    <ProjectReference Include="..\csharpclient\client\CSharpAPI.csproj" />
   </ItemGroup>
 
   <ItemGroup>

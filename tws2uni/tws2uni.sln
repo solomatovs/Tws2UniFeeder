@@ -5,9 +5,7 @@ VisualStudioVersion = 16.0.29306.81
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "tws2uni", "tws2uni.csproj", "{C8E7E355-8CA4-493E-81EE-745C80F58EB5}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CSharpAPI", "C:\Users\s.solomatov\Downloads\ibapi-master\source\csharpclient\client\CSharpAPI.csproj", "{EC2CF075-A887-428E-B2D9-32D48DFCCDFB}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "InterReact", "..\..\InterReact\InterReact\InterReact.csproj", "{3DDAED59-16ED-412D-A81D-074FC658AB15}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CSharpAPI", "..\csharpclient\client\CSharpAPI.csproj", "{EC2CF075-A887-428E-B2D9-32D48DFCCDFB}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -23,10 +21,6 @@ Global
 		{EC2CF075-A887-428E-B2D9-32D48DFCCDFB}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{EC2CF075-A887-428E-B2D9-32D48DFCCDFB}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{EC2CF075-A887-428E-B2D9-32D48DFCCDFB}.Release|Any CPU.Build.0 = Release|Any CPU
-		{3DDAED59-16ED-412D-A81D-074FC658AB15}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{3DDAED59-16ED-412D-A81D-074FC658AB15}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{3DDAED59-16ED-412D-A81D-074FC658AB15}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{3DDAED59-16ED-412D-A81D-074FC658AB15}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
