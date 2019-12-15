@@ -38,7 +38,7 @@ namespace tws2uni
                     services.AddSingleton<IBackgroundQueue<TwsTick>, BackgroundTickQueue>();
                     services.AddSingleton<IRealTimeDataProvider, RealTimeDataProvider>();
 
-                    services.AddHostedService<TwsConsumer>();
+                    services.AddHostedService<TwsProducer>();
                     services.AddHostedService<UniFeedConsumer>();
                 })
                 .Build();

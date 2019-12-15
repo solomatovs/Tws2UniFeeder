@@ -9,13 +9,13 @@ using System.Reactive.Linq;
 namespace tws2uni
 {
     using tws;
-    class TwsConsumer : BackgroundService
+    class TwsProducer : BackgroundService
     {
-        public TwsConsumer(IOptions<TwsOption> option, IRealTimeDataProvider provider, ILoggerFactory loggerFactory)
+        public TwsProducer(IOptions<TwsOption> option, IRealTimeDataProvider provider, ILoggerFactory loggerFactory)
         {
             this.option = option.Value;
             this.provider = provider;
-            this.logger = loggerFactory.CreateLogger<TwsConsumer>();
+            this.logger = loggerFactory.CreateLogger<TwsProducer>();
         }
 
         private readonly TwsOption option;
