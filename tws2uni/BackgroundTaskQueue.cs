@@ -5,7 +5,7 @@ using System.Collections.Concurrent;
 
 namespace tws2uni
 {
-    public class BackgroundTaskQueue : IBackgroundTaskQueue<Func<CancellationToken, Task>>
+    public class BackgroundTaskQueue : IBackgroundQueue<Func<CancellationToken, Task>>
     {
         private readonly ConcurrentQueue<Func<CancellationToken, Task>> workItems = new ConcurrentQueue<Func<CancellationToken, Task>>();
         private readonly SemaphoreSlim signal = new SemaphoreSlim(0);

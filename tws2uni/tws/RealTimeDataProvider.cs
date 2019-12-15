@@ -12,7 +12,7 @@ namespace tws2uni.tws
         private readonly ILogger logger;
         private readonly EWrapperImpl wrapper;
         private readonly ConcurrentDictionary<Contract, int> requestIdsBySymbol = new ConcurrentDictionary<Contract, int>(new ContractEqualityComparer());
-        public RealTimeDataProvider(IBackgroundTaskQueue<TwsTick> queue, ILoggerFactory loggerFactory)
+        public RealTimeDataProvider(IBackgroundQueue<TwsTick> queue, ILoggerFactory loggerFactory)
         {
             this.logger = loggerFactory.CreateLogger<RealTimeDataProvider>();
             this.wrapper = new EWrapperImpl(queue, requestIdsBySymbol, loggerFactory);

@@ -12,13 +12,13 @@ namespace tws2uni
     {
         private readonly ILogger logger;
 
-        public UniFeedConsumer(IBackgroundTaskQueue<TwsTick> taskQueue, ILoggerFactory loggerFactory)
+        public UniFeedConsumer(IBackgroundQueue<TwsTick> taskQueue, ILoggerFactory loggerFactory)
         {
             TaskQueue = taskQueue;
             logger = loggerFactory.CreateLogger<UniFeedConsumer>();
         }
 
-        public IBackgroundTaskQueue<TwsTick> TaskQueue { get; }
+        public IBackgroundQueue<TwsTick> TaskQueue { get; }
 
         protected async override Task ExecuteAsync(CancellationToken cancellationToken)
         {

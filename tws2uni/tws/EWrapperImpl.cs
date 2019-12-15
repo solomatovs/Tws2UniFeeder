@@ -13,7 +13,7 @@ namespace tws2uni.tws
     {
         private readonly IReadOnlyDictionary<Contract, int> requestIdsBySymbol;
         private readonly IDictionary<int, Contract> symbolByContract = new ConcurrentDictionary<int, Contract>();
-        private readonly IBackgroundTaskQueue<TwsTick> taskQueue;
+        private readonly IBackgroundQueue<TwsTick> taskQueue;
         private readonly ILogger logger;
         //! [ewrapperimpl]
         private int nextOrderId;
@@ -23,7 +23,7 @@ namespace tws2uni.tws
         //! [socket_declare]
 
         //! [socket_init]
-        public EWrapperImpl(IBackgroundTaskQueue<TwsTick> taskQueue, IReadOnlyDictionary<Contract, int> requestIdsBySymbol, ILoggerFactory loggerFactory)
+        public EWrapperImpl(IBackgroundQueue<TwsTick> taskQueue, IReadOnlyDictionary<Contract, int> requestIdsBySymbol, ILoggerFactory loggerFactory)
         {
             this.logger = loggerFactory.CreateLogger<EWrapperImpl>();
             this.requestIdsBySymbol = requestIdsBySymbol;

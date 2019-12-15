@@ -35,7 +35,7 @@ namespace tws2uni
 
                     services.Configure<TwsOption>(option => hostContext.Configuration.GetSection("tws").Bind(option));
 
-                    services.AddSingleton<IBackgroundTaskQueue<TwsTick>, BackgroundTickQueue>();
+                    services.AddSingleton<IBackgroundQueue<TwsTick>, BackgroundTickQueue>();
                     services.AddSingleton<IRealTimeDataProvider, RealTimeDataProvider>();
 
                     services.AddHostedService<TwsConsumer>();

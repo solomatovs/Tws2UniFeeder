@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 
 namespace tws2uni
 {
-    public interface IBackgroundTaskQueue<T>
+    public interface IBackgroundQueue<T>
     {
         void QueueBackgroundWorkItem(T workItem);
 

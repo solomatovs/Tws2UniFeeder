@@ -6,7 +6,7 @@ using System.Collections.Concurrent;
 namespace tws2uni
 {
     using tws;
-    public class BackgroundTickQueue : IBackgroundTaskQueue<TwsTick>
+    public class BackgroundTickQueue : IBackgroundQueue<TwsTick>
     {
         private readonly ConcurrentQueue<TwsTick> workItems = new ConcurrentQueue<TwsTick>();
         private readonly SemaphoreSlim signal = new SemaphoreSlim(0);
