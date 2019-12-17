@@ -5,6 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using RxSockets;
 
 namespace tws2uni
 {
@@ -37,8 +38,9 @@ namespace tws2uni
 
                     services.AddSingleton<IBackgroundQueue<TwsTick>, BackgroundTickQueue>();
                     services.AddSingleton<IRealTimeDataProvider, RealTimeDataProvider>();
+                    //services.IRxSocketServer(hostContext.Configuration.GetSection("UniFeedServer"));
 
-                    services.AddHostedService<TwsProducer>();
+                    //services.AddHostedService<TwsProducer>();
                     services.AddHostedService<UniFeedConsumer>();
                 })
                 .Build();
