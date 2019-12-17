@@ -33,24 +33,28 @@ namespace tws2uni
 
         protected async Task UniFeederServerLoop(IRxSocketServer server, CancellationToken cancellationToken)
         {
-            var accept = await server.AcceptObservable.ToTask();
-            @"Universal DDE Connector 9.00
-Copyright 1999 - 2008 MetaQuotes Software Corp.
-Login: ".ToByteArray().SendTo(accept);
-
-            accept.ReceiveObservable.ToUniFeederStrings().Subscribe(login =>
+            server.AcceptObservable.Subscribe(onNext: accept =>
             {
-                logger.LogInformation($"login reveived: '{login}'");
+                @"> Universal DDE Connector 9.00
+> Copyright 1999 - 2008 MetaQuotes Software Corp.
+> Login: ".ToByteArray().SendTo(accept);
 
-                accept.Send("> Password: ".ToByteArray());
-                accept.ReceiveObservable.ToUniFeederStrings().Subscribe(onNext: password =>
+                accept.ReceiveObservable.ToUniFeederStrings().Subscribe(login =>
                 {
-                    logger.LogInformation($"password reveived: '{password}'");
-                    accept.Send("> Access granted".ToByteArray());
+                    logger.LogInformation($"login reveived: '{login}'");
 
-                    ProccessLoop(cancellationToken).ConfigureAwait(false);
+                    accept.Send("> Password: ".ToByteArray());
+                    accept.ReceiveObservable.ToUniFeederStrings().Subscribe(onNext: async password =>
+                    {
+                        logger.LogInformation($"password reveived: '{password}'");
+                        accept.Send("> Access granted".ToByteArray());
+
+                        await ProccessLoop(cancellationToken);
+                    });
                 });
-            });
+            }, cancellationToken);
+
+            await server.AcceptObservable.ToTask(cancellationToken);
         }
 
         protected async Task ProccessLoop(CancellationToken token)

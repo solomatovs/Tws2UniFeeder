@@ -38,10 +38,9 @@ namespace tws2uni
             if (source == null)
                 throw new ArgumentNullException(nameof(source));
 
-            var ms = new MemoryStream();
-
             return Observable.Create<string>(observer =>
             {
+                var ms = new MemoryStream();
                 return source.Subscribe(
                     onNext: b =>
                     {
@@ -60,6 +59,8 @@ namespace tws2uni
                             observer.OnCompleted();
                         else
                             observer.OnError(new InvalidDataException("ToStrings: no termination(2)."));
+
+                        ms.Dispose();
                     });
             });
         }
