@@ -1,19 +1,17 @@
 ﻿using System;
-using System.Threading;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using IBApi;
 
-namespace tws2uni.tws
+namespace Tws2UniFeeder
 {
     public class EWrapperImpl : EWrapper
     {
-        private readonly IReadOnlyDictionary<Contract, int> requestIdsBySymbol;
-        private readonly IDictionary<int, Contract> symbolByContract = new ConcurrentDictionary<int, Contract>();
-        private readonly IBackgroundQueue<TwsTick> taskQueue;
+        private readonly IOptions<TwsOption> option;
+        private readonly IBackgroundQueue<Quote> queue;
         private readonly ILogger logger;
         //! [ewrapperimpl]
         private int nextOrderId;
@@ -23,13 +21,13 @@ namespace tws2uni.tws
         //! [socket_declare]
 
         //! [socket_init]
-        public EWrapperImpl(IBackgroundQueue<TwsTick> taskQueue, IReadOnlyDictionary<Contract, int> requestIdsBySymbol, ILoggerFactory loggerFactory)
+        public EWrapperImpl(IOptions<TwsOption> option, IBackgroundQueue<Quote> queue, ILoggerFactory loggerFactory)
         {
+            this.option = option;
             this.logger = loggerFactory.CreateLogger<EWrapperImpl>();
-            this.requestIdsBySymbol = requestIdsBySymbol;
             this.signal = new EReaderMonitorSignal();
             this.clientSocket = new EClientSocket(this, signal);
-            this.taskQueue = taskQueue;
+            this.queue = queue;
         }
         //! [socket_init]
 
@@ -47,22 +45,13 @@ namespace tws2uni.tws
 
         public string BboExchange { get; private set; }
 
-        protected Contract GetSymbolByRequestId(int request)
+        protected string GetSymbolByRequestId(int request)
         {
-            if(!symbolByContract.TryGetValue(request, out Contract contract))
-            {
-                if(requestIdsBySymbol.Values.Contains(request))
-                {
-                    contract = requestIdsBySymbol.First(p => p.Value == request).Key;
-                    symbolByContract.Add(request, contract);
-                }
-            }
-
-            return contract;
+            return option.Value.Mapping.FirstOrDefault(c => c.Value.RequestId == request).Key;
         }
         public virtual void error(Exception e)
         {
-            logger.LogInformation("Exception thrown: " + e);
+            logger.LogDebug(e.Message, "Exception thrown: ");
             throw e;
         }
 
@@ -790,16 +779,11 @@ namespace tws2uni.tws
         //! [tickbytickbidask]
         public void tickByTickBidAsk(int reqId, long time, double bidPrice, double askPrice, int bidSize, int askSize, TickAttribBidAsk tickAttribBidAsk)
         {
-            taskQueue.QueueBackgroundWorkItem(new TwsTick
+            queue.QueueBackgroundWorkItem(new Quote
             {
-                askPrice = askPrice,
-                bidPrice = bidPrice,
-                reqId = reqId,
-                time = time,
-                askSize = askSize,
-                bidSize = bidSize,
-                tickAttribBidAsk = tickAttribBidAsk,
-                symbol = GetSymbolByRequestId(reqId)
+                Ask = askPrice,
+                Bid = bidPrice,
+                Symbol = GetSymbolByRequestId(reqId)
             });
         }
         //! [tickbytickbidask]

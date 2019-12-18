@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.29306.81
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "tws2uni", "tws2uni.csproj", "{C8E7E355-8CA4-493E-81EE-745C80F58EB5}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tws2UniFeeder", "Tws2UniFeeder.csproj", "{C8E7E355-8CA4-493E-81EE-745C80F58EB5}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CSharpAPI", "..\csharpclient\client\CSharpAPI.csproj", "{EC2CF075-A887-428E-B2D9-32D48DFCCDFB}"
 EndProject

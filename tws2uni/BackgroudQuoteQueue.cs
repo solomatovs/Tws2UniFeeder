@@ -3,15 +3,14 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Concurrent;
 
-namespace tws2uni
+namespace Tws2UniFeeder
 {
-    using tws;
-    public class BackgroundTickQueue : IBackgroundQueue<TwsTick>
+    public class BackgroundQuoteQueue : IBackgroundQueue<Quote>
     {
-        private readonly ConcurrentQueue<TwsTick> workItems = new ConcurrentQueue<TwsTick>();
+        private readonly ConcurrentQueue<Quote> workItems = new ConcurrentQueue<Quote>();
         private readonly SemaphoreSlim signal = new SemaphoreSlim(0);
 
-        public void QueueBackgroundWorkItem(TwsTick workItem)
+        public void QueueBackgroundWorkItem(Quote workItem)
         {
             if (workItem == null)
             {
@@ -22,7 +21,7 @@ namespace tws2uni
             signal.Release();
         }
 
-        public async Task<TwsTick> DequeueAsync(CancellationToken cancellationToken)
+        public async Task<Quote> DequeueAsync(CancellationToken cancellationToken)
         {
             await signal.WaitAsync(cancellationToken);
             workItems.TryDequeue(out var workItem);

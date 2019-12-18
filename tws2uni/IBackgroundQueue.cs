@@ -1,8 +1,7 @@
-﻿using System;
-using System.Threading;
+﻿using System.Threading;
 using System.Threading.Tasks;
 
-namespace tws2uni
+namespace Tws2UniFeeder
 {
     public interface IBackgroundQueue<T>
     {

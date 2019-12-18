@@ -5,11 +5,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using RxSockets;
 
-namespace tws2uni
+namespace Tws2UniFeeder
 {
-    using tws;
     class Program
     {
         public static async Task Main(string[] args)
@@ -34,13 +32,13 @@ namespace tws2uni
                 {
                     services.AddOptions();
 
-                    services.Configure<TwsOption>(option => hostContext.Configuration.GetSection("tws").Bind(option));
+                    services.Configure<TwsOption>(option => hostContext.Configuration.GetSection("Tws").Bind(option));
+                    services.Configure<UniFeederOption>(option => hostContext.Configuration.GetSection("UniFeeder").Bind(option));
 
-                    services.AddSingleton<IBackgroundQueue<TwsTick>, BackgroundTickQueue>();
-                    services.AddSingleton<IRealTimeDataProvider, RealTimeDataProvider>();
-                    //services.IRxSocketServer(hostContext.Configuration.GetSection("UniFeedServer"));
+                    services.AddSingleton<IBackgroundQueue<Quote>, BackgroundQuoteQueue>();
+                    services.AddSingleton<ITwsProvider, TwsProvider>();
 
-                    //services.AddHostedService<TwsProducer>();
+                    services.AddHostedService<TwsProducer>();
                     services.AddHostedService<UniFeedConsumer>();
                 })
                 .Build();

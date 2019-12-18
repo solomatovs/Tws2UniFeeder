@@ -1,21 +1,19 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using IBApi;
 
-namespace tws2uni.tws
+namespace Tws2UniFeeder
 {
-    class RealTimeDataProvider : IRealTimeDataProvider
+    class TwsProvider : ITwsProvider
     {
         private readonly ILogger logger;
         private readonly EWrapperImpl wrapper;
-        private readonly ConcurrentDictionary<Contract, int> requestIdsBySymbol = new ConcurrentDictionary<Contract, int>(new ContractEqualityComparer());
-        public RealTimeDataProvider(IBackgroundQueue<TwsTick> queue, ILoggerFactory loggerFactory)
+        public TwsProvider(IOptions<TwsOption> option, IBackgroundQueue<Quote> queue, ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger<RealTimeDataProvider>();
-            this.wrapper = new EWrapperImpl(queue, requestIdsBySymbol, loggerFactory);
+            this.logger = loggerFactory.CreateLogger<TwsProvider>();
+            this.wrapper = new EWrapperImpl(option, queue, loggerFactory);
         }
 
         public Action Disconnecting = null;
@@ -44,6 +42,11 @@ namespace tws2uni.tws
             }
         }
 
+        public bool IsConnected
+        {
+            get { return wrapper.ClientSocket.IsConnected(); }
+        }
+
         private void StartLoopProcessMsgs(EReader reader)
         {
             new Thread(() =>
@@ -61,7 +64,6 @@ namespace tws2uni.tws
         {
             try
             {
-                requestIdsBySymbol.Clear();
                 Disconnecting = null;
                 wrapper.ClientSocket.eDisconnect();
             }
@@ -72,25 +74,14 @@ namespace tws2uni.tws
             }
         }
 
-        public void SubscribeTickByTick(Contract symbol)
+        public void SubscribeTickByTick(Mapping contract)
         {
-            var request = new Random().Next();
-            wrapper.ClientSocket.reqTickByTickData(request, symbol, "BidAsk", 0, false);
-            while (!requestIdsBySymbol.TryAdd(symbol, request)) { }
+            wrapper.ClientSocket.reqTickByTickData(contract.RequestId, contract, "BidAsk", 0, false);
         }
 
-        public void UnSubscribeTickByTick(Contract symbol)
+        public void UnSubscribeTickByTick(Mapping contract)
         {
-            requestIdsBySymbol.TryRemove(symbol, out int request);
-            try
-            {
-                wrapper.ClientSocket.cancelTickByTickData(request);
-            }
-            catch
-            {
-                while (!requestIdsBySymbol.TryAdd(symbol, request)) { }
-                throw;
-            }
+            wrapper.ClientSocket.cancelTickByTickData(contract.RequestId);
         }
     }
 }

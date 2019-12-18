@@ -1,16 +1,15 @@
 ﻿using System;
-using System.Threading;
 using System.Collections.Generic;
 using System.IO;
 using System.Reactive.Linq;
 using System.Text;
 
-namespace tws2uni
+namespace Tws2UniFeeder
 {
     public static class ConversionUniFeederStringEx
     {
-        public static byte[] ToUniFeederByteArray(this string s) => Encoding.UTF8.GetBytes(s + "\0");
-
+        public static byte[] ToUniFeederByteArray(this string s) => Encoding.UTF8.GetBytes(s + "\r\n");
+        public static byte[] ToByteArrayWithZeroEnd(this string s) => Encoding.UTF8.GetBytes(s + "\0");
         public static IEnumerable<string> ToUniFeederStrings(this IEnumerable<byte> source)
         {
             if (source == null)
@@ -18,15 +17,19 @@ namespace tws2uni
 
             using (var ms = new MemoryStream())
             {
+                byte prev_b = 0;
                 foreach (var b in source)
                 {
-                    if (b == 0)
+                    if (IsUniFeederDivider(b, prev_b))
                     {
-                        yield return GetString(ms);
+                        yield return GetUnFeederString(ms);
                         ms.SetLength(0);
+                        prev_b = 0;
                     }
                     else
                         ms.WriteByte(b);
+
+                    prev_b = b;
                 }
                 if (ms.Position != 0)
                     throw new InvalidDataException("ToStrings: no termination(1).");
@@ -38,19 +41,24 @@ namespace tws2uni
             if (source == null)
                 throw new ArgumentNullException(nameof(source));
 
+            var ms = new MemoryStream();
+
             return Observable.Create<string>(observer =>
             {
-                var ms = new MemoryStream();
+                byte prev_b = 0;
                 return source.Subscribe(
                     onNext: b =>
                     {
-                        if (b.isUniFeederDivider())
+                        if (IsUniFeederDivider(b, prev_b))
                         {
-                            observer.OnNext(GetString(ms));
+                            observer.OnNext(GetUnFeederString(ms));
                             ms.SetLength(0);
+                            prev_b = 0;
                         }
                         else
                             ms.WriteByte(b);
+
+                        prev_b = b;
                     },
                     onError: observer.OnError,
                     onCompleted: () =>
@@ -65,7 +73,11 @@ namespace tws2uni
             });
         }
 
-        private static string GetString(in MemoryStream ms) => Encoding.UTF8.GetString(ms.GetBuffer(), 0, (int)ms.Position);
-        private static bool isUniFeederDivider(this byte c) => c == 13;
+        private static string GetUnFeederString(in MemoryStream ms) => Encoding.UTF8.GetString(ms.GetBuffer(), 0, (int)ms.Position - 1);
+        private static bool IsUniFeederDivider(byte c, byte prev_b)
+        {
+            return c == 10 && prev_b == 13;
+        }
+    
     }
 }
