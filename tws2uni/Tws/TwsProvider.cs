@@ -18,12 +18,9 @@ namespace Tws2UniFeeder
 
         public Action Disconnecting = null;
 
-        public void Connect(string host, int port, int clientId, bool autoReconnect = true)
+        public void Connect(string host, int port, int clientId)
         {
             VConnect(host, port, clientId);
-
-            if (autoReconnect)
-                Disconnecting = () => VConnect(host, port, clientId);
         }
 
         private void VConnect(string host, int port, int clientId)

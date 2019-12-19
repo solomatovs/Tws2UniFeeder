@@ -3,6 +3,8 @@ using System.Net;
 using System.Threading;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -18,12 +20,14 @@ namespace Tws2UniFeeder
         private readonly ILoggerFactory loggerFactory;
         private readonly IBackgroundQueue<Quote> queue;
         private readonly IOptions<UniFeederOption> option;
+        private readonly ConcurrentDictionary<int, IRxSocketClient> clients;
 
         public UniFeedConsumer(IOptions<UniFeederOption> option, IBackgroundQueue<Quote> queue, ILoggerFactory loggerFactory)
         {
             this.option = option;
             this.queue = queue;
             this.loggerFactory = loggerFactory;
+            this.clients = new ConcurrentDictionary<int, IRxSocketClient>();
             logger = loggerFactory.CreateLogger<UniFeedConsumer>();
         }
 
@@ -34,8 +38,13 @@ namespace Tws2UniFeeder
             using (var server = end.CreateRxSocketServer(loggerFactory.CreateLogger<RxSocketServer>()))
             {
                 UniFeederServer(server, cancellationToken);
-                
-                await Task.Delay(-1, cancellationToken);
+
+                try {
+                    await Loop(token: cancellationToken);
+                }
+                catch (OperationCanceledException) {
+                    logger.LogInformation("Loop canceled");
+                }
             }
         }
 
@@ -46,27 +55,19 @@ namespace Tws2UniFeeder
                 @"> Universal DDE Connector 9.00
 > Copyright 1999 - 2008 MetaQuotes Software Corp.
 > Login: ".ToByteArrayWithZeroEnd().SendTo(accept);
-
+                var clientId = new Random().Next();
                 var auth = new UniFeederAuthorizationOption();
                 accept.ReceiveObservable.ToUniFeederStrings().Subscribe(
-                    onNext: async message =>
+                    onNext: message =>
                     {
-                        if (!auth.IsFilled)
-                        {
+                        if (!auth.IsFilled) {
                             FillAuth(accept, auth, message);
                         }
 
-                        if (auth.IsFilled)
-                        {
+                        if (auth.IsFilled) {
                             if (Authentificate(auth)) {
+                                clients.TryAdd(clientId, accept);
                                 "> Access granted".ToUniFeederByteArray().SendTo(accept);
-                                
-                                try {
-                                    await Loop(cancellationToken);
-                                }
-                                catch(OperationCanceledException e) {
-                                    logger.LogInformation("Loop canceled");
-                                }
                             }
                             else {
                                 "> Access denied".ToUniFeederByteArray().SendTo(accept);
@@ -74,7 +75,14 @@ namespace Tws2UniFeeder
                             }
                         }
                     },
-                    onError: e => logger.LogError(e.Message)
+                    onError: e => logger.LogError(e.Message), 
+                    onCompleted: () =>
+                    {
+                        if (clients.TryRemove(clientId, out IRxSocketClient client))
+                        {
+                            client.Dispose();
+                        }
+                    }
                  );
             });
         }
@@ -104,8 +112,13 @@ namespace Tws2UniFeeder
         {
             while (!token.IsCancellationRequested)
             {
-                var tick = await queue.DequeueAsync(token);
-                logger.LogInformation(tick.ToString());
+                var quote = await queue.DequeueAsync(token);
+                var quoteUniFeederFormat = quote.ToString().ToUniFeederByteArray();
+
+                clients.AsParallel().ForAll(c =>
+                {
+                    c.Value.Send(quoteUniFeederFormat);
+                });
             }
         }
     }

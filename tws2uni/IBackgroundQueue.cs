@@ -8,7 +8,5 @@ namespace Tws2UniFeeder
         void QueueBackgroundWorkItem(T workItem);
 
         Task<T> DequeueAsync(CancellationToken cancellationToken);
-
-        int CountTask();
     }
 }

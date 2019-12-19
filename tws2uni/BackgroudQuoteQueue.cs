@@ -28,10 +28,5 @@ namespace Tws2UniFeeder
 
             return workItem;
         }
-
-        public int CountTask()
-        {
-            return workItems.Count;
-        }
     }
 }

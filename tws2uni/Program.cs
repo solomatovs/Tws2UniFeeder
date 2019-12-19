@@ -16,7 +16,7 @@ namespace Tws2UniFeeder
                 
                 .ConfigureAppConfiguration((hostContext, config) =>
                 {
-                    config.SetBasePath(Directory.GetCurrentDirectory()); Console.WriteLine(Directory.GetCurrentDirectory());
+                    config.SetBasePath(Directory.GetCurrentDirectory());
                     config.AddEnvironmentVariables();
                     config.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
                     config.AddCommandLine(args);

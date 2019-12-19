@@ -57,15 +57,32 @@ namespace Tws2UniFeeder
 
         public virtual void error(string str)
         {
-            logger.LogInformation("Error: " + str + "\n");
+            logger.LogError("Error: " + str + "\n");
+            this.ClientSocket.eDisconnect(resetState: true);
         }
 
         //! [error]
         public virtual void error(int id, int errorCode, string errorMsg)
         {
-            logger.LogInformation("Error. Id: " + id + ", Code: " + errorCode + ", Msg: " + errorMsg + "\n");
+            if (isErrorCode(errorCode))
+            {
+                logger.LogError("Error. Id: " + id + ", Code: " + errorCode + ", Msg: " + errorMsg + "\n");
+                this.ClientSocket.eDisconnect(resetState: true);
+            }
+            else
+            {
+                logger.LogInformation("Warning. Id: " + id + ", Code: " + errorCode + ", Msg: " + errorMsg + "\n");
+            }
         }
         //! [error]
+
+        private bool isErrorCode(int error)
+        {
+            if (error >= 2000 && error < 3000)
+                return false;
+
+            return true;
+        }
 
         public virtual void connectionClosed()
         {

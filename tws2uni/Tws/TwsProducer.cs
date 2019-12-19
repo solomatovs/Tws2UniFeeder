@@ -23,8 +23,6 @@ namespace Tws2UniFeeder
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            var contracts = option.Mapping;
-
             stoppingToken.Register(() =>
             {
                 logger.LogInformation("Stoping...");
@@ -32,13 +30,30 @@ namespace Tws2UniFeeder
                 logger.LogInformation("Stoped");
             });
 
-            while(!provider.IsConnected && !stoppingToken.IsCancellationRequested)
+            new Thread(async () =>
+            {
+                while(!stoppingToken.IsCancellationRequested)
+                {
+                    while (!provider.IsConnected && !stoppingToken.IsCancellationRequested)
+                    {
+                        await ConnectAndSubscribe(stoppingToken);
+                    }
+                }
+            })
+            { IsBackground = true }.Start();
+
+            await Task.Delay(-1, stoppingToken);
+        }
+
+        protected async Task ConnectAndSubscribe(CancellationToken stoppingToken)
+        {
+            while (!provider.IsConnected && !stoppingToken.IsCancellationRequested)
             {
                 try
                 {
-                    provider.Connect(option.Host, option.Port, option.ClientID, autoReconnect: true);
+                    provider.Connect(option.Host, option.Port, option.ClientID);
                 }
-                catch(Exception e)
+                catch (Exception e)
                 {
                     logger.LogError($"Connection failed: {e.Message}");
                 }
@@ -47,12 +62,10 @@ namespace Tws2UniFeeder
                     await Task.Delay(5000, stoppingToken);
                 }
             }
-            
-            if (!stoppingToken.IsCancellationRequested)
-            foreach (var contract in contracts)
-                provider.SubscribeTickByTick(contract.Value);
 
-            await Task.Delay(-1, stoppingToken);
+            if (!stoppingToken.IsCancellationRequested)
+                foreach (var contract in option.Mapping)
+                    provider.SubscribeTickByTick(contract.Value);
         }
     }
 }
