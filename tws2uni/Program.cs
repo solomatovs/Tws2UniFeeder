@@ -25,7 +25,7 @@ namespace Tws2UniFeeder
                 {
                     logging.AddConsole(c =>
                     {
-                        c.Format = Microsoft.Extensions.Logging.Console.ConsoleLoggerFormat.Systemd;
+                        c.Format = Microsoft.Extensions.Logging.Console.ConsoleLoggerFormat.Default;
                     });
                 })
                 .ConfigureServices((hostContext, services) =>

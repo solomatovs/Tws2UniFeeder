@@ -4,7 +4,7 @@ using System.Threading;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
+using System.Globalization;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -113,13 +113,22 @@ namespace Tws2UniFeeder
             while (!token.IsCancellationRequested)
             {
                 var quote = await queue.DequeueAsync(token);
-                var quoteUniFeederFormat = quote.ToString().ToUniFeederByteArray();
+                var quoteUniFeederFormat = quote.ToUniFeederStringFormat().ToUniFeederByteArray();
 
                 clients.AsParallel().ForAll(c =>
                 {
                     c.Value.Send(quoteUniFeederFormat);
                 });
             }
+        }
+    }
+
+    public static class QuotesUniFeederEx
+    {
+        public static string ToUniFeederStringFormat(this Quote q)
+        {
+            // return string.Format(CultureInfo.InvariantCulture, "{0} {1} {2}", q.Symbol, q.Bid, q.Ask);
+            return $"{q.Symbol} {q.Bid} {q.Ask}";
         }
     }
 }

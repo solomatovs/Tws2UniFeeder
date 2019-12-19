@@ -66,12 +66,19 @@ namespace Tws2UniFeeder
         {
             if (isErrorCode(errorCode))
             {
-                logger.LogError("Error. Id: " + id + ", Code: " + errorCode + ", Msg: " + errorMsg + "\n");
-                this.ClientSocket.eDisconnect(resetState: true);
+                switch(errorCode)
+                {
+                    case 200: logger.LogError($"The contract description specified for '{GetSymbolByRequestId(id)}' is ambiguous. errorCode: '{errorMsg}'\n"); break;
+                    case 354: logger.LogError($"'{GetSymbolByRequestId(id)}' You do not have live market data available in your account for the specified instruments. For further details please refer to Streaming Market Data. errorCode: '{errorMsg}'\n"); break;
+                    default:
+                        logger.LogError("Error. Id: " + id + ", Code: " + errorCode + ", Msg: " + errorMsg + "\n");
+                        this.ClientSocket.eDisconnect(resetState: true);
+                        break;
+                }
             }
             else
             {
-                logger.LogInformation("Warning. Id: " + id + ", Code: " + errorCode + ", Msg: " + errorMsg + "\n");
+                logger.LogInformation("Id: " + id + ", Code: " + errorCode + ", Msg: " + errorMsg + "\n");
             }
         }
         //! [error]
