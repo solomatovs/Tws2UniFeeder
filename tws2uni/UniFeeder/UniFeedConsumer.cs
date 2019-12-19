@@ -127,8 +127,8 @@ namespace Tws2UniFeeder
     {
         public static string ToUniFeederStringFormat(this Quote q)
         {
-            // return string.Format(CultureInfo.InvariantCulture, "{0} {1} {2}", q.Symbol, q.Bid, q.Ask);
-            return $"{q.Symbol} {q.Bid} {q.Ask}";
+            return string.Format(CultureInfo.InvariantCulture, "{0} {1} {2}", q.Symbol, q.Bid, q.Ask);
+            // return $"{q.Symbol} {q.Bid} {q.Ask}";
         }
     }
 }
