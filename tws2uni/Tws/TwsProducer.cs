@@ -25,24 +25,16 @@ namespace Tws2UniFeeder
         {
             stoppingToken.Register(() =>
             {
-                logger.LogInformation("Stoping...");
                 provider.Disconnect();
-                logger.LogInformation("Stoped");
             });
 
-            new Thread(async () =>
+            while(!stoppingToken.IsCancellationRequested)
             {
-                while(!stoppingToken.IsCancellationRequested)
+                while (!provider.IsConnected && !stoppingToken.IsCancellationRequested)
                 {
-                    while (!provider.IsConnected && !stoppingToken.IsCancellationRequested)
-                    {
-                        await ConnectAndSubscribe(stoppingToken);
-                    }
+                    await ConnectAndSubscribe(stoppingToken);
                 }
-            })
-            { IsBackground = true }.Start();
-
-            await Task.Delay(-1, stoppingToken);
+            }
         }
 
         protected async Task ConnectAndSubscribe(CancellationToken stoppingToken)
