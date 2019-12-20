@@ -70,6 +70,7 @@ namespace Tws2UniFeeder
                 {
                     case 200: logger.LogError($"The contract description specified for '{GetSymbolByRequestId(id)}' is ambiguous. errorCode: '{errorMsg}'\n"); break;
                     case 354: logger.LogError($"'{GetSymbolByRequestId(id)}' You do not have live market data available in your account for the specified instruments. For further details please refer to Streaming Market Data. errorCode: '{errorMsg}'\n"); break;
+                    case 10190: logger.LogError($"'{GetSymbolByRequestId(id)}' Max number of tick-by-tick requests has been reached. errorCode: '{errorMsg}'\n"); break;
                     default:
                         logger.LogError("Error. Id: " + id + ", Code: " + errorCode + ", Msg: " + errorMsg + "\n");
                         this.ClientSocket.eDisconnect(resetState: true);
