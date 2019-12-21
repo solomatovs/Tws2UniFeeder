@@ -30,14 +30,14 @@ namespace Tws2UniFeeder
 
             while(!stoppingToken.IsCancellationRequested)
             {
-                while (!provider.IsConnected && !stoppingToken.IsCancellationRequested)
-                {
-                    await ConnectAndSubscribe(stoppingToken);
-                }
+                var taskConnet = Connect(stoppingToken);
+                var taskSubscribe = Subscribe(stoppingToken);
+
+                Task.WaitAll(taskConnet, taskConnet);
             }
         }
 
-        protected async Task ConnectAndSubscribe(CancellationToken stoppingToken)
+        protected async Task Connect(CancellationToken stoppingToken)
         {
             while (!provider.IsConnected && !stoppingToken.IsCancellationRequested)
             {
@@ -51,13 +51,20 @@ namespace Tws2UniFeeder
                 }
                 finally
                 {
-                    await Task.Delay(5000, stoppingToken);
+                    await Task.Delay(option.ReconnectPeriodSecond * 1000, stoppingToken);
                 }
             }
+        }
 
-            if (!stoppingToken.IsCancellationRequested)
+        protected async Task Subscribe(CancellationToken stoppingToken)
+        {
+            while (provider.IsConnected && !stoppingToken.IsCancellationRequested)
+            {
                 foreach (var contract in option.Mapping)
                     provider.SubscribeTickByTick(contract.Value);
+
+                await Task.Delay(10000, stoppingToken);
+            }
         }
     }
 }

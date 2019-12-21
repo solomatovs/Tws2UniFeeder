@@ -10,7 +10,7 @@ namespace Tws2UniFeeder
 {
     public class EWrapperImpl : EWrapper
     {
-        private readonly IOptions<TwsOption> option;
+        private readonly SubscriptionDictionary subscription;
         private readonly IBackgroundQueue<Quote> queue;
         private readonly ILogger logger;
         //! [ewrapperimpl]
@@ -21,9 +21,9 @@ namespace Tws2UniFeeder
         //! [socket_declare]
 
         //! [socket_init]
-        public EWrapperImpl(IOptions<TwsOption> option, IBackgroundQueue<Quote> queue, ILoggerFactory loggerFactory)
+        public EWrapperImpl(SubscriptionDictionary subscription, IBackgroundQueue<Quote> queue, ILoggerFactory loggerFactory)
         {
-            this.option = option;
+            this.subscription = subscription;
             this.logger = loggerFactory.CreateLogger<EWrapperImpl>();
             this.signal = new EReaderMonitorSignal();
             this.clientSocket = new EClientSocket(this, signal);
@@ -45,10 +45,6 @@ namespace Tws2UniFeeder
 
         public string BboExchange { get; private set; }
 
-        protected string GetSymbolByRequestId(int request)
-        {
-            return option.Value.Mapping.FirstOrDefault(c => c.Value.RequestId == request).Key;
-        }
         public virtual void error(Exception e)
         {
             logger.LogDebug(e.Message, "Exception thrown: ");
@@ -68,9 +64,18 @@ namespace Tws2UniFeeder
             {
                 switch(errorCode)
                 {
-                    case 200: logger.LogError($"The contract description specified for '{GetSymbolByRequestId(id)}' is ambiguous. errorCode: '{errorMsg}'\n"); break;
-                    case 354: logger.LogError($"'{GetSymbolByRequestId(id)}' You do not have live market data available in your account for the specified instruments. For further details please refer to Streaming Market Data. errorCode: '{errorMsg}'\n"); break;
-                    case 10190: logger.LogError($"'{GetSymbolByRequestId(id)}' Max number of tick-by-tick requests has been reached. errorCode: '{errorMsg}'\n"); break;
+                    case 200: 
+                        logger.LogError($"The contract description specified for '{subscription.GetSymbolNameByRequestId(id)}' is ambiguous. errorCode: '{errorMsg}'\n");
+                        subscription.ChangeStatusForRequest(id, RequestStatus.RequestFailed);
+                        break;
+                    case 354: 
+                        logger.LogError($"'{subscription.GetSymbolNameByRequestId(id)}' You do not have live market data available in your account for the specified instruments. For further details please refer to Streaming Market Data. errorCode: '{errorMsg}'\n");
+                        subscription.ChangeStatusForRequest(id, RequestStatus.RequestFailed);
+                        break;
+                    case 10190: 
+                        logger.LogError($"'{subscription.GetSymbolNameByRequestId(id)}' Max number of tick-by-tick requests has been reached. errorCode: '{errorMsg}'\n");
+                        subscription.ChangeStatusForRequest(id, RequestStatus.RetryNeeded);
+                        break;
                     default:
                         logger.LogError("Error. Id: " + id + ", Code: " + errorCode + ", Msg: " + errorMsg + "\n");
                         this.ClientSocket.eDisconnect(resetState: true);
@@ -808,7 +813,7 @@ namespace Tws2UniFeeder
             {
                 Ask = askPrice,
                 Bid = bidPrice,
-                Symbol = GetSymbolByRequestId(reqId)
+                Symbol = subscription.GetSymbolNameByRequestId(reqId)
             });
         }
         //! [tickbytickbidask]
