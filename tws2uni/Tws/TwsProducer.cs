@@ -28,16 +28,18 @@ namespace Tws2UniFeeder
                 provider.Disconnect();
             });
 
-            while(!stoppingToken.IsCancellationRequested)
-            {
-                var taskConnet = Connect(stoppingToken);
-                var taskSubscribe = Subscribe(stoppingToken);
+            foreach (var contract in option.Mapping)
+                provider.SubscribeTickByTick(contract.Key, contract.Value);
 
-                Task.WaitAll(taskConnet, taskConnet);
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                Connect(stoppingToken);
+
+                await Task.Delay(option.ReconnectPeriodSecond * 1000, stoppingToken);
             }
         }
 
-        protected async Task Connect(CancellationToken stoppingToken)
+        protected void Connect(CancellationToken stoppingToken)
         {
             while (!provider.IsConnected && !stoppingToken.IsCancellationRequested)
             {
@@ -45,25 +47,7 @@ namespace Tws2UniFeeder
                 {
                     provider.Connect(option.Host, option.Port, option.ClientID);
                 }
-                catch (Exception e)
-                {
-                    logger.LogError($"Connection failed: {e.Message}");
-                }
-                finally
-                {
-                    await Task.Delay(option.ReconnectPeriodSecond * 1000, stoppingToken);
-                }
-            }
-        }
-
-        protected async Task Subscribe(CancellationToken stoppingToken)
-        {
-            while (provider.IsConnected && !stoppingToken.IsCancellationRequested)
-            {
-                foreach (var contract in option.Mapping)
-                    provider.SubscribeTickByTick(contract.Value);
-
-                await Task.Delay(10000, stoppingToken);
+                catch { }
             }
         }
     }

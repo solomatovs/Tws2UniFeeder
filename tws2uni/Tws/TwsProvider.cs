@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using IBApi;
 
 namespace Tws2UniFeeder
@@ -10,13 +10,13 @@ namespace Tws2UniFeeder
     {
         private readonly ILogger logger;
         private readonly EWrapperImpl wrapper;
-        public TwsProvider(IOptions<TwsOption> option, IBackgroundQueue<Quote> queue, ILoggerFactory loggerFactory)
+        private readonly SubscriptionDictionary subscription;
+        public TwsProvider(IBackgroundQueue<Quote> queue, ILoggerFactory loggerFactory)
         {
+            this.subscription = new SubscriptionDictionary();
             this.logger = loggerFactory.CreateLogger<TwsProvider>();
-            this.wrapper = new EWrapperImpl(option, queue, loggerFactory);
+            this.wrapper = new EWrapperImpl(this.subscription, queue, loggerFactory);
         }
-
-        public Action Disconnecting = null;
 
         public void Connect(string host, int port, int clientId)
         {
@@ -31,6 +31,7 @@ namespace Tws2UniFeeder
                 var reader = new EReader(wrapper.ClientSocket, wrapper.signal);
                 reader.Start();
                 StartLoopProcessMsgs(reader);
+                StartSubscribeProcess();
             }
             catch (Exception e)
             {
@@ -61,8 +62,8 @@ namespace Tws2UniFeeder
         {
             try
             {
-                Disconnecting = null;
                 wrapper.ClientSocket.eDisconnect();
+                this.subscription.ClearSymbols();
             }
             catch (Exception e)
             {
@@ -71,14 +72,28 @@ namespace Tws2UniFeeder
             }
         }
 
-        public void SubscribeTickByTick(Mapping contract)
+        public void SubscribeTickByTick(string symbol, Contract contract)
         {
-            wrapper.ClientSocket.reqTickByTickData(contract.RequestId, contract, "BidAsk", 0, false);
+            this.subscription.AddSymbol(symbol, contract);
         }
 
-        public void UnSubscribeTickByTick(Mapping contract)
+        protected void StartSubscribeProcess()
         {
-            wrapper.ClientSocket.cancelTickByTickData(contract.RequestId);
+            new Thread(() =>
+            {
+                while (wrapper.ClientSocket.IsConnected())
+                {
+                    this.subscription.ForUnsubscribed((mapping, contract) =>
+                    {
+                        wrapper.ClientSocket.reqTickByTickData(mapping.RequestId, contract, mapping.TickType, 0, false);
+                        mapping.RequestStatus = RequestStatus.RequestSuccess;
+                        Thread.Sleep(TimeSpan.FromSeconds(5));
+                    });
+
+                    Thread.Sleep(TimeSpan.FromSeconds(10));
+                }
+            })
+            { IsBackground = true }.Start();
         }
     }
 }

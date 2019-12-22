@@ -28,11 +28,12 @@ namespace Tws2UniFeeder
         public int RequestId { get; set; } = 0;
         public RequestStatus RequestStatus { get; set; } = RequestStatus.WasNotRequested;
         public string Symbol { get; set; } = string.Empty;
+        public string TickType { get; set; } = "BidAsk";
     }
 
     public class SubscriptionDictionary
     {
-        private readonly SortedDictionary<Mapping, Contract> map = new SortedDictionary<Mapping, Contract>();
+        private readonly Dictionary<Mapping, Contract> map = new Dictionary<Mapping, Contract>();
         private readonly Random rand = new Random();
 
         public SubscriptionDictionary() { }
@@ -73,6 +74,47 @@ namespace Tws2UniFeeder
             {
                 this.map.Add(predicate.Key, predicate.Value);
             }
+        }
+
+        public void ForUnsubscribed(Action<Mapping, Contract> actionOnSymbol)
+        {
+            foreach (var s in this.map)
+            {
+                if (s.Key.RequestStatus == RequestStatus.WasNotRequested || s.Key.RequestStatus == RequestStatus.RetryNeeded)
+                {
+                    actionOnSymbol(s.Key, s.Value);
+                }
+            }
+        }
+
+        public void SetNotRequestedForAllSymbols()
+        {
+            foreach(var s in this.map)
+            {
+                s.Key.RequestStatus = RequestStatus.WasNotRequested;
+            }
+        }
+
+        public int RequestIdBySymbolName(string name)
+        {
+            return this.map.FirstOrDefault(p => p.Key.Symbol == name).Key.RequestId;
+        }
+
+        public void ReGenerateRequestIdForSymbol(int requestId)
+        {
+            foreach (var s in this.map)
+            {
+                if (s.Key.RequestId == requestId)
+                {
+                    s.Key.RequestId = rand.Next();
+                    s.Key.RequestStatus = RequestStatus.WasNotRequested;
+                }
+            }
+        }
+
+        public void ClearSymbols()
+        {
+            this.map.Clear();
         }
     }
     public static class ContractEx
