@@ -82,7 +82,7 @@ namespace Tws2UniFeeder
                         break;
                     case 10190: 
                         logger.LogError($"'{subscription.GetSymbolNameByRequestId(id)}' Error: {errorMsg}. errorCode: '{errorCode}'\n");
-                        subscription.ChangeStatusForRequest(id, RequestStatus.RetryNeeded);
+                        subscription.ChangeStatusForRequest(id, RequestStatus.RequestFailed);
                         break;
                     default:
                         logger.LogError("Error. Id: " + id + ", Code: " + errorCode + ", Msg: " + errorMsg + "\n");

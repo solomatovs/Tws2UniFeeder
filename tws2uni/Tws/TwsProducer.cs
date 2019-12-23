@@ -35,7 +35,7 @@ namespace Tws2UniFeeder
             {
                 Connect(stoppingToken);
 
-                await Task.Delay(option.ReconnectPeriodSecond * 1000, stoppingToken);
+                await Task.Delay(TimeSpan.FromSeconds(option.ReconnectPeriodSecond), stoppingToken);
             }
         }
 
