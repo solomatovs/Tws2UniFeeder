@@ -54,7 +54,7 @@ namespace Tws2UniFeeder
             {
                 @"> Universal DDE Connector 9.00
 > Copyright 1999 - 2008 MetaQuotes Software Corp.
-> Login: ".ToByteArrayWithZeroEnd().SendTo(accept);
+> Login: ".ToUniFeederByteArray().SendTo(accept);
                 var clientId = new Random().Next();
                 var auth = new UniFeederAuthorizationOption();
                 accept.ReceiveObservable.ToUniFeederStrings().Subscribe(
@@ -92,7 +92,7 @@ namespace Tws2UniFeeder
             if (string.IsNullOrEmpty(auth.Login)) {
                 auth.Login = message;
 
-                "> Password: ".ToByteArrayWithZeroEnd().SendTo(accept);
+                "> Password: ".ToUniFeederByteArray().SendTo(accept);
 
                 return;
             }
@@ -128,7 +128,6 @@ namespace Tws2UniFeeder
         public static string ToUniFeederStringFormat(this Quote q)
         {
             return string.Format(CultureInfo.InvariantCulture, "{0} {1} {2}", q.Symbol, q.Bid, q.Ask);
-            // return $"{q.Symbol} {q.Bid} {q.Ask}";
         }
     }
 }

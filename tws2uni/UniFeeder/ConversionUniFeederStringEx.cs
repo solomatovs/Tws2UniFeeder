@@ -9,7 +9,6 @@ namespace Tws2UniFeeder
     public static class ConversionUniFeederStringEx
     {
         public static byte[] ToUniFeederByteArray(this string s) => Encoding.UTF8.GetBytes(s + "\r\n");
-        public static byte[] ToByteArrayWithZeroEnd(this string s) => Encoding.UTF8.GetBytes(s + "\0");
         public static IEnumerable<string> ToUniFeederStrings(this IEnumerable<byte> source)
         {
             if (source == null)
