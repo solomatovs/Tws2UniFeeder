@@ -11,7 +11,7 @@ namespace Tws2UniFeeder
     public class EWrapperImpl : EWrapper
     {
         private readonly SubscriptionDictionary subscription;
-        private readonly IBackgroundQueue<Quote> queue;
+        private readonly IBackgroundQueue<Tick> queue;
         private readonly ILogger logger;
         //! [ewrapperimpl]
         private int nextOrderId;
@@ -21,7 +21,7 @@ namespace Tws2UniFeeder
         //! [socket_declare]
 
         //! [socket_init]
-        public EWrapperImpl(SubscriptionDictionary subscription, IBackgroundQueue<Quote> queue, ILoggerFactory loggerFactory)
+        public EWrapperImpl(SubscriptionDictionary subscription, IBackgroundQueue<Tick> queue, ILoggerFactory loggerFactory)
         {
             this.subscription = subscription;
             this.logger = loggerFactory.CreateLogger<EWrapperImpl>();
@@ -69,7 +69,7 @@ namespace Tws2UniFeeder
                         subscription.ChangeStatusForRequest(id, RequestStatus.RequestFailed);
                         break;
                     case 354: 
-                        logger.LogError($"'{subscription.GetSymbolNameByRequestId(id)}' You do not have live market data available in your account for the specified instruments. For further details please refer to Streaming Market Data. errorCode: '{errorCode}'\n");
+                        logger.LogError($"'{subscription.GetSymbolNameByRequestId(id)}' Error: {errorMsg}. errorCode: '{errorCode}'\n");
                         subscription.ChangeStatusForRequest(id, RequestStatus.RequestFailed);
                         break;
                     case 502:
@@ -77,17 +77,21 @@ namespace Tws2UniFeeder
                         subscription.ReGenerateRequestIdForSymbol(id);
                         break;
                     case 504:
-                        logger.LogError($"{errorMsg}. errorCode: '{errorCode}'\n");
+                        logger.LogError($"Error: {errorMsg}. errorCode: '{errorCode}'\n");
                         subscription.SetNotRequestedForAllSymbols();
+                        break;
+                    case 10168:
+                        logger.LogError($"'{subscription.GetSymbolNameByRequestId(id)}' Error: {errorMsg}. errorCode: '{errorCode}'\n");
+                        subscription.ChangeStatusForRequest(id, RequestStatus.RequestFailed);
                         break;
                     case 10190:
                         logger.LogError($"'{subscription.GetSymbolNameByRequestId(id)}' Error: {errorMsg}. errorCode: '{errorCode}'\n");
                         subscription.ChangeStatusForRequest(id, RequestStatus.RequestFailed);
                         break;
                     default:
-                        logger.LogError("Error. Id: " + id + ", Code: " + errorCode + ", Msg: " + errorMsg + "\n");
+                        logger.LogError($"Symbol: {subscription.GetSymbolNameByRequestId(id)}, Id: {id}, Error: {errorMsg}. errorCode: '{errorCode}'\n");
                         subscription.ChangeStatusForRequest(id, RequestStatus.RequestFailed);
-                        this.ClientSocket.eDisconnect(resetState: true);
+                        // this.ClientSocket.eDisconnect(resetState: true);
                         break;
                 }
             }
@@ -113,47 +117,57 @@ namespace Tws2UniFeeder
 
         public virtual void currentTime(long time)
         {
-            logger.LogInformation("Current Time: " + time + "\n");
+            // logger.LogInformation("Current Time: " + time + "\n");
         }
 
         //! [tickprice]
         public virtual void tickPrice(int tickerId, int field, double price, TickAttrib attribs)
         {
-            logger.LogInformation("Tick Price. Ticker Id:" + tickerId + ", Field: " + field + ", Price: " + price + ", CanAutoExecute: " + attribs.CanAutoExecute +
-                ", PastLimit: " + attribs.PastLimit + ", PreOpen: " + attribs.PreOpen);
+            if (field == (int)TickType.BidPrice || field == (int)TickType.AskPrice)
+            {
+                queue.QueueBackgroundWorkItem(new Tick
+                {
+                    Symbol = subscription.GetSymbolNameByRequestId(tickerId),
+                    TickType = (TickType)field,
+                    Price = price
+                });
+            }
+
+            //logger.LogInformation("Tick Price. Ticker Id:" + tickerId + ", Field: " + field + ", Price: " + price + ", CanAutoExecute: " + attribs.CanAutoExecute +
+            //    ", PastLimit: " + attribs.PastLimit + ", PreOpen: " + attribs.PreOpen);
         }
         //! [tickprice]
 
         //! [ticksize]
         public virtual void tickSize(int tickerId, int field, int size)
         {
-            logger.LogInformation("Tick Size. Ticker Id:" + tickerId + ", Field: " + field + ", Size: " + size);
+            // logger.LogInformation("Tick Size. Ticker Id:" + tickerId + ", Field: " + field + ", Size: " + size);
         }
         //! [ticksize]
 
         //! [tickstring]
         public virtual void tickString(int tickerId, int tickType, string value)
         {
-            logger.LogInformation("Tick string. Ticker Id:" + tickerId + ", Type: " + tickType + ", Value: " + value);
+            // logger.LogInformation("Tick string. Ticker Id:" + tickerId + ", Type: " + tickType + ", Value: " + value);
         }
         //! [tickstring]
 
         //! [tickgeneric]
         public virtual void tickGeneric(int tickerId, int field, double value)
         {
-            logger.LogInformation("Tick Generic. Ticker Id:" + tickerId + ", Field: " + field + ", Value: " + value);
+            // logger.LogInformation("Tick Generic. Ticker Id:" + tickerId + ", Field: " + field + ", Value: " + value);
         }
         //! [tickgeneric]
 
         public virtual void tickEFP(int tickerId, int tickType, double basisPoints, string formattedBasisPoints, double impliedFuture, int holdDays, string futureLastTradeDate, double dividendImpact, double dividendsToLastTradeDate)
         {
-            logger.LogInformation("TickEFP. " + tickerId + ", Type: " + tickType + ", BasisPoints: " + basisPoints + ", FormattedBasisPoints: " + formattedBasisPoints + ", ImpliedFuture: " + impliedFuture + ", HoldDays: " + holdDays + ", FutureLastTradeDate: " + futureLastTradeDate + ", DividendImpact: " + dividendImpact + ", DividendsToLastTradeDate: " + dividendsToLastTradeDate);
+           // logger.LogInformation("TickEFP. " + tickerId + ", Type: " + tickType + ", BasisPoints: " + basisPoints + ", FormattedBasisPoints: " + formattedBasisPoints + ", ImpliedFuture: " + impliedFuture + ", HoldDays: " + holdDays + ", FutureLastTradeDate: " + futureLastTradeDate + ", DividendImpact: " + dividendImpact + ", DividendsToLastTradeDate: " + dividendsToLastTradeDate);
         }
 
         //! [ticksnapshotend]
         public virtual void tickSnapshotEnd(int tickerId)
         {
-            logger.LogInformation("TickSnapshotEnd: " + tickerId);
+            // logger.LogInformation("TickSnapshotEnd: " + tickerId);
         }
         //! [ticksnapshotend]
 
@@ -407,7 +421,7 @@ namespace Tws2UniFeeder
         //! [marketdatatype]
         public virtual void marketDataType(int reqId, int marketDataType)
         {
-            logger.LogInformation("MarketDataType. " + reqId + ", Type: " + marketDataType + "\n");
+            // logger.LogInformation("MarketDataType. " + reqId + ", Type: " + marketDataType + "\n");
         }
         //! [marketdatatype]
 
@@ -666,7 +680,7 @@ namespace Tws2UniFeeder
         //! [tickReqParams]
         public void tickReqParams(int tickerId, double minTick, string bboExchange, int snapshotPermissions)
         {
-            logger.LogInformation("id={0} minTick = {1} bboExchange = {2} snapshotPermissions = {3}", tickerId, minTick, bboExchange, snapshotPermissions);
+            // logger.LogInformation("id={0} minTick = {1} bboExchange = {2} snapshotPermissions = {3}", tickerId, minTick, bboExchange, snapshotPermissions);
 
             BboExchange = bboExchange;
         }
@@ -818,12 +832,6 @@ namespace Tws2UniFeeder
         //! [tickbytickbidask]
         public void tickByTickBidAsk(int reqId, long time, double bidPrice, double askPrice, int bidSize, int askSize, TickAttribBidAsk tickAttribBidAsk)
         {
-            queue.QueueBackgroundWorkItem(new Quote
-            {
-                Ask = askPrice,
-                Bid = bidPrice,
-                Symbol = subscription.GetSymbolNameByRequestId(reqId)
-            });
         }
         //! [tickbytickbidask]
 

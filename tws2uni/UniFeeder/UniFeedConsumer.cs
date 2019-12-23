@@ -3,6 +3,8 @@ using System.Net;
 using System.Threading;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Collections.Generic;
+using System.Collections;
 using System.Collections.Concurrent;
 using System.Globalization;
 using Microsoft.Extensions.Hosting;
@@ -16,18 +18,20 @@ namespace Tws2UniFeeder
 {
     public class UniFeedConsumer : BackgroundService
     {
+        private readonly IOptions<UniFeederOption> option;
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
-        private readonly IBackgroundQueue<Quote> queue;
-        private readonly IOptions<UniFeederOption> option;
+        private readonly IBackgroundQueue<Tick> queue;
+        private readonly ConcurrentDictionary<string, Quote> quotes;
         private readonly ConcurrentDictionary<int, IRxSocketClient> clients;
 
-        public UniFeedConsumer(IOptions<UniFeederOption> option, IBackgroundQueue<Quote> queue, ILoggerFactory loggerFactory)
+        public UniFeedConsumer(IOptions<UniFeederOption> option, IBackgroundQueue<Tick> queue, ILoggerFactory loggerFactory)
         {
             this.option = option;
             this.queue = queue;
             this.loggerFactory = loggerFactory;
             this.clients = new ConcurrentDictionary<int, IRxSocketClient>();
+            this.quotes = new ConcurrentDictionary<string, Quote>();
             logger = loggerFactory.CreateLogger<UniFeedConsumer>();
         }
 
@@ -112,13 +116,31 @@ namespace Tws2UniFeeder
         {
             while (!token.IsCancellationRequested)
             {
-                var quote = await queue.DequeueAsync(token);
-                var quoteUniFeederFormat = quote.ToUniFeederStringFormat().ToUniFeederByteArray();
+                var tick = await queue.DequeueAsync(token);
 
-                clients.AsParallel().ForAll(c =>
+                quotes.AddOrUpdate(tick.Symbol, s => new Quote
                 {
-                    c.Value.Send(quoteUniFeederFormat);
+                    Symbol = tick.Symbol,
+                    Ask = tick.TickType == TickType.AskPrice ? tick.Price : 0,
+                    Bid = tick.TickType == TickType.BidPrice ? tick.Price : 0
+                }, (s, q) => new Quote
+                {
+                    Symbol = tick.Symbol,
+                    Ask = tick.TickType == TickType.AskPrice ? tick.Price : q.Ask,
+                    Bid = tick.TickType == TickType.BidPrice ? tick.Price : q.Bid
                 });
+
+                if(quotes.TryGetValue(tick.Symbol, out Quote quote))
+                {
+                    if (quote.IsFilled())
+                    {
+                        var quoteUniFeederFormat = quote.ToUniFeederStringFormat().ToUniFeederByteArray();
+                        clients.AsParallel().ForAll(c =>
+                        {
+                            c.Value.Send(quoteUniFeederFormat);
+                        });
+                    }
+                }
             }
         }
     }

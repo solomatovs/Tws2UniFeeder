@@ -10,7 +10,7 @@ namespace Tws2UniFeeder
         private readonly ILogger logger;
         private readonly EWrapperImpl wrapper;
         private readonly SubscriptionDictionary subscription;
-        public TwsProvider(IBackgroundQueue<Quote> queue, ILoggerFactory loggerFactory)
+        public TwsProvider(IBackgroundQueue<Tick> queue, ILoggerFactory loggerFactory)
         {
             this.subscription = new SubscriptionDictionary();
             this.logger = loggerFactory.CreateLogger<TwsProvider>();
@@ -71,7 +71,7 @@ namespace Tws2UniFeeder
             }
         }
 
-        public void SubscribeTickByTick(string symbol, Contract contract)
+        public void SubscribeMktData(string symbol, Contract contract)
         {
             this.subscription.AddSymbol(symbol, contract);
         }
@@ -84,9 +84,9 @@ namespace Tws2UniFeeder
                 {
                     this.subscription.ForUnsubscribed((mapping, contract) =>
                     {
-                        wrapper.ClientSocket.reqTickByTickData(mapping.RequestId, contract, mapping.TickType, 0, false);
+                        wrapper.ClientSocket.reqMktData(mapping.RequestId, contract, string.Empty, false, false, null);
                         mapping.RequestStatus = RequestStatus.RequestSuccess;
-                        Thread.Sleep(TimeSpan.FromSeconds(5));
+                        Thread.Sleep(TimeSpan.FromSeconds(1));
                     });
 
                     Thread.Sleep(TimeSpan.FromSeconds(10));

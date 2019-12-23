@@ -14,12 +14,12 @@ namespace Tws2UniFeeder
         {
             this.option = option.Value;
             this.provider = provider;
-            this.logger = loggerFactory.CreateLogger<TwsProducer>();
+            this.Logger = loggerFactory.CreateLogger<TwsProducer>();
         }
 
         private readonly TwsOption option;
         private readonly ITwsProvider provider;
-        private readonly ILogger logger;
+        private readonly ILogger Logger;
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
@@ -29,7 +29,7 @@ namespace Tws2UniFeeder
             });
 
             foreach (var contract in option.Mapping)
-                provider.SubscribeTickByTick(contract.Key, contract.Value);
+                provider.SubscribeMktData(contract.Key, contract.Value);
 
             while (!stoppingToken.IsCancellationRequested)
             {
