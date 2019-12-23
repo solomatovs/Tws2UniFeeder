@@ -80,7 +80,7 @@ namespace Tws2UniFeeder
                         logger.LogError($"{errorMsg}. errorCode: '{errorCode}'\n");
                         subscription.SetNotRequestedForAllSymbols();
                         break;
-                    case 10190: 
+                    case 10190:
                         logger.LogError($"'{subscription.GetSymbolNameByRequestId(id)}' Error: {errorMsg}. errorCode: '{errorCode}'\n");
                         subscription.ChangeStatusForRequest(id, RequestStatus.RequestFailed);
                         break;

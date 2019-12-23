@@ -5,12 +5,12 @@ using System.Collections.Concurrent;
 
 namespace Tws2UniFeeder
 {
-    public class BackgroundQuoteQueue : IBackgroundQueue<Quote>
+    public class BackgroundQueue<T> : IBackgroundQueue<T>
     {
-        private readonly ConcurrentQueue<Quote> workItems = new ConcurrentQueue<Quote>();
+        private readonly ConcurrentQueue<T> workItems = new ConcurrentQueue<T>();
         private readonly SemaphoreSlim signal = new SemaphoreSlim(0);
 
-        public void QueueBackgroundWorkItem(Quote workItem)
+        public void QueueBackgroundWorkItem(T workItem)
         {
             if (workItem == null)
             {
@@ -21,7 +21,7 @@ namespace Tws2UniFeeder
             signal.Release();
         }
 
-        public async Task<Quote> DequeueAsync(CancellationToken cancellationToken)
+        public async Task<T> DequeueAsync(CancellationToken cancellationToken)
         {
             await signal.WaitAsync(cancellationToken);
             workItems.TryDequeue(out var workItem);

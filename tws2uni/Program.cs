@@ -35,7 +35,7 @@ namespace Tws2UniFeeder
                     services.Configure<TwsOption>(option => hostContext.Configuration.GetSection("Tws").Bind(option));
                     services.Configure<UniFeederOption>(option => hostContext.Configuration.GetSection("UniFeeder").Bind(option));
 
-                    services.AddSingleton<IBackgroundQueue<Quote>, BackgroundQuoteQueue>();
+                    services.AddSingleton<IBackgroundQueue<Quote>, BackgroundQueue<Quote>>();
                     services.AddSingleton<ITwsProvider, TwsProvider>();
 
                     services.AddHostedService<TwsProducer>();
