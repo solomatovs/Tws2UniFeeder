@@ -44,7 +44,7 @@ namespace Tws2UniFeeder
 
                     provider.Connect(option.Host, option.Port, option.ClientID, stoppingToken);
 
-                    logger.LogInformation("Connected success to {Host} ...", $"{option.Host}:{option.Port}");
+                    //logger.LogInformation("Connected success to {Host} ...", $"{option.Host}:{option.Port}");
                     await Task.Delay(TimeSpan.FromSeconds(option.ReconnectPeriodSecond), stoppingToken).ContinueWith(p => { });
                 }
             }

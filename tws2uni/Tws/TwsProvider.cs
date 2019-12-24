@@ -47,6 +47,8 @@ namespace Tws2UniFeeder
                 wrapper.signal.waitForSignal();
                 reader.processMsgs();
             }
+
+            subscription.SetNotRequestedForAllSymbols();
         }
 
         public void Disconnect()
@@ -76,7 +78,7 @@ namespace Tws2UniFeeder
                 {
                     wrapper.ClientSocket.reqMktData(mapping.RequestId, contract, string.Empty, false, false, null);
                     mapping.RequestStatus = RequestStatus.RequestSuccess;
-                    Task.Delay(TimeSpan.FromSeconds(1), stoppingToken).ContinueWith(p => { }).Wait();
+                    // Task.Delay(TimeSpan.FromSeconds(1), stoppingToken).ContinueWith(p => { }).Wait();
                 });
 
                 Task.Delay(TimeSpan.FromSeconds(2), stoppingToken).ContinueWith(p => { }).Wait();

@@ -67,10 +67,14 @@ namespace Tws2UniFeeder
                     if (quote.IsFilled())
                     {
                         var quoteUniFeederFormat = quote.ToUniFeederStringFormat().ToUniFeederByteArray();
-                        clients.AsParallel().ForAll(c =>
+                        try
                         {
-                            c.Value.Send(quoteUniFeederFormat);
-                        });
+                            clients.AsParallel().ForAll(c =>
+                            {
+                                c.Value.Send(quoteUniFeederFormat);
+                            });
+                        }
+                        catch { }
                     }
                 }
             }
