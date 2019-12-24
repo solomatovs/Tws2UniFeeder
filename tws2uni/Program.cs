@@ -5,6 +5,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Serilog;
+using Serilog.Configuration;
 
 namespace Tws2UniFeeder
 {
@@ -13,20 +15,16 @@ namespace Tws2UniFeeder
         public static async Task Main(string[] args)
         {
             var host = new HostBuilder()
-                
                 .ConfigureAppConfiguration((hostContext, config) =>
                 {
-                    config.SetBasePath(Directory.GetCurrentDirectory());
+                    config.SetBasePath(hostContext.HostingEnvironment.ContentRootPath);
                     config.AddEnvironmentVariables();
-                    config.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
+                    config.AddJsonFile("appsettings.json", optional: true, reloadOnChange: true);
                     config.AddCommandLine(args);
                 })
-                .ConfigureLogging(logging =>
+                .ConfigureLogging((hostContext, logging) =>
                 {
-                    logging.AddConsole(c =>
-                    {
-                        c.Format = Microsoft.Extensions.Logging.Console.ConsoleLoggerFormat.Default;
-                    });
+                    logging.AddSerilog((new LoggerConfiguration()).ReadFrom.Configuration(hostContext.Configuration).CreateLogger() , dispose: true);
                 })
                 .ConfigureServices((hostContext, services) =>
                 {
@@ -39,23 +37,18 @@ namespace Tws2UniFeeder
                     services.AddSingleton<IBackgroundQueue<Tick>,  BackgroundQueue<Tick>>();
                     services.AddSingleton<ITwsProvider, TwsProvider>();
 
-                    services.AddHostedService<TwsProducer>();
                     services.AddHostedService<UniFeedConsumer>();
+                    services.AddHostedService<TwsProducer>();
                 })
                 .Build();
 
             using (host)
             {
-                Console.WriteLine("Starting!");
                 await host.StartAsync();
 
-                Console.WriteLine("Started! Press ctrl+c to stop.");
                 await host.WaitForShutdownAsync();
 
-                Console.WriteLine("Stopping!");
-
                 await host.StopAsync();
-                Console.WriteLine("Stopped!");
             }
         }
     }
