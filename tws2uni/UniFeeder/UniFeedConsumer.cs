@@ -39,15 +39,39 @@ namespace Tws2UniFeeder
         {
             var end = new IPEndPoint(IPAddress.Parse(option.Value.Ip), option.Value.Port);
 
-            using (var server = end.CreateRxSocketServer(loggerFactory.CreateLogger<RxSocketServer>()))
-            {
-                UniFeederServer(server, cancellationToken);
+            using var server = end.CreateRxSocketServer(loggerFactory.CreateLogger<RxSocketServer>());
+            UniFeederServer(server, cancellationToken);
 
-                try {
-                    await Loop(token: cancellationToken);
-                }
-                catch (OperationCanceledException) {
-                    logger.LogInformation("Loop canceled");
+            await Loop(token: cancellationToken);
+        }
+        private async Task Loop(CancellationToken token)
+        {
+            while (!token.IsCancellationRequested)
+            {
+                var tick = await queue.DequeueAsync(token);
+
+                quotes.AddOrUpdate(tick.Symbol, s => new Quote
+                {
+                    Symbol = tick.Symbol,
+                    Ask = tick.TickType == TickType.AskPrice ? tick.Price : 0,
+                    Bid = tick.TickType == TickType.BidPrice ? tick.Price : 0
+                }, (s, q) => new Quote
+                {
+                    Symbol = tick.Symbol,
+                    Ask = tick.TickType == TickType.AskPrice ? tick.Price : q.Ask,
+                    Bid = tick.TickType == TickType.BidPrice ? tick.Price : q.Bid
+                });
+
+                if (quotes.TryGetValue(tick.Symbol, out Quote quote))
+                {
+                    if (quote.IsFilled())
+                    {
+                        var quoteUniFeederFormat = quote.ToUniFeederStringFormat().ToUniFeederByteArray();
+                        clients.AsParallel().ForAll(c =>
+                        {
+                            c.Value.Send(quoteUniFeederFormat);
+                        });
+                    }
                 }
             }
         }
@@ -110,38 +134,6 @@ namespace Tws2UniFeeder
         private bool Authentificate(UniFeederAuthorizationOption auth)
         {
             return option.Value.Authorization.Any(a => a.Equals(auth));
-        }
-        
-        private async Task Loop(CancellationToken token)
-        {
-            while (!token.IsCancellationRequested)
-            {
-                var tick = await queue.DequeueAsync(token);
-
-                quotes.AddOrUpdate(tick.Symbol, s => new Quote
-                {
-                    Symbol = tick.Symbol,
-                    Ask = tick.TickType == TickType.AskPrice ? tick.Price : 0,
-                    Bid = tick.TickType == TickType.BidPrice ? tick.Price : 0
-                }, (s, q) => new Quote
-                {
-                    Symbol = tick.Symbol,
-                    Ask = tick.TickType == TickType.AskPrice ? tick.Price : q.Ask,
-                    Bid = tick.TickType == TickType.BidPrice ? tick.Price : q.Bid
-                });
-
-                if(quotes.TryGetValue(tick.Symbol, out Quote quote))
-                {
-                    if (quote.IsFilled())
-                    {
-                        var quoteUniFeederFormat = quote.ToUniFeederStringFormat().ToUniFeederByteArray();
-                        clients.AsParallel().ForAll(c =>
-                        {
-                            c.Value.Send(quoteUniFeederFormat);
-                        });
-                    }
-                }
-            }
         }
     }
 

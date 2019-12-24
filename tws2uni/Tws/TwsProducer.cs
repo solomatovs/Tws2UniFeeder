@@ -14,12 +14,12 @@ namespace Tws2UniFeeder
         {
             this.option = option.Value;
             this.provider = provider;
-            this.Logger = loggerFactory.CreateLogger<TwsProducer>();
+            this.logger = loggerFactory.CreateLogger<TwsProducer>();
         }
 
         private readonly TwsOption option;
         private readonly ITwsProvider provider;
-        private readonly ILogger Logger;
+        private readonly ILogger logger;
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
@@ -31,23 +31,22 @@ namespace Tws2UniFeeder
             foreach (var contract in option.Mapping)
                 provider.SubscribeMktData(contract.Key, contract.Value);
 
-            while (!stoppingToken.IsCancellationRequested)
-            {
-                Connect(stoppingToken);
-
-                await Task.Delay(TimeSpan.FromSeconds(option.ReconnectPeriodSecond), stoppingToken);
-            }
+            await Loop(stoppingToken);
         }
 
-        protected void Connect(CancellationToken stoppingToken)
+        protected async Task Loop(CancellationToken stoppingToken)
         {
-            while (!provider.IsConnected && !stoppingToken.IsCancellationRequested)
+            while (!stoppingToken.IsCancellationRequested)
             {
-                try
+                while (!provider.IsConnected && !stoppingToken.IsCancellationRequested)
                 {
-                    provider.Connect(option.Host, option.Port, option.ClientID);
+                    logger.LogInformation("Connecting to {Host} ...", $"{option.Host}:{option.Port}");
+
+                    provider.Connect(option.Host, option.Port, option.ClientID, stoppingToken);
+
+                    logger.LogInformation("Connected success to {Host} ...", $"{option.Host}:{option.Port}");
+                    await Task.Delay(TimeSpan.FromSeconds(option.ReconnectPeriodSecond), stoppingToken).ContinueWith(p => { });
                 }
-                catch { }
             }
         }
     }

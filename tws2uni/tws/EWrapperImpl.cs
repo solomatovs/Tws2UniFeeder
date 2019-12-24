@@ -60,36 +60,32 @@ namespace Tws2UniFeeder
         //! [error]
         public virtual void error(int id, int errorCode, string errorMsg)
         {
+            var loggerFormat = "{errorCode} requestId: {id} {symbol}: {errorMsg}";
             if (IsErrorCode(errorCode))
             {
-                switch(errorCode)
+                logger.LogError(loggerFormat, errorCode, id, subscription.GetSymbolNameByRequestId(id), errorMsg);
+                switch (errorCode)
                 {
-                    case 200: 
-                        logger.LogError($"The contract description specified for '{subscription.GetSymbolNameByRequestId(id)}' is ambiguous. errorCode: '{errorCode}'\n");
+                    case 200:
                         subscription.ChangeStatusForRequest(id, RequestStatus.RequestFailed);
                         break;
                     case 354: 
-                        logger.LogError($"'{subscription.GetSymbolNameByRequestId(id)}' Error: {errorMsg}. errorCode: '{errorCode}'\n");
                         subscription.ChangeStatusForRequest(id, RequestStatus.RequestFailed);
                         break;
                     case 502:
-                        logger.LogError($"'{subscription.GetSymbolNameByRequestId(id)}' Duplicate ticker id: {id}. errorCode: '{errorCode}'\n");
                         subscription.ReGenerateRequestIdForSymbol(id);
                         break;
                     case 504:
-                        logger.LogError($"Error: {errorMsg}. errorCode: '{errorCode}'\n");
                         subscription.SetNotRequestedForAllSymbols();
+                        this.ClientSocket.eDisconnect(resetState: true);
                         break;
                     case 10168:
-                        logger.LogError($"'{subscription.GetSymbolNameByRequestId(id)}' Error: {errorMsg}. errorCode: '{errorCode}'\n");
                         subscription.ChangeStatusForRequest(id, RequestStatus.RequestFailed);
                         break;
                     case 10190:
-                        logger.LogError($"'{subscription.GetSymbolNameByRequestId(id)}' Error: {errorMsg}. errorCode: '{errorCode}'\n");
                         subscription.ChangeStatusForRequest(id, RequestStatus.RequestFailed);
                         break;
                     default:
-                        logger.LogError($"Symbol: {subscription.GetSymbolNameByRequestId(id)}, Id: {id}, Error: {errorMsg}. errorCode: '{errorCode}'\n");
                         subscription.ChangeStatusForRequest(id, RequestStatus.RequestFailed);
                         // this.ClientSocket.eDisconnect(resetState: true);
                         break;
@@ -97,7 +93,7 @@ namespace Tws2UniFeeder
             }
             else
             {
-                logger.LogInformation("Id: " + id + ", Code: " + errorCode + ", Msg: " + errorMsg + "\n");
+                logger.LogDebug(loggerFormat, errorCode, subscription.GetSymbolNameByRequestId(id), id, errorMsg);
             }
         }
         //! [error]

@@ -47,7 +47,7 @@ namespace Tws2UniFeeder
 
         public string GetSymbolNameByRequestId(int requestId)
         {
-            return this.map.Keys.FirstOrDefault(c => c.RequestId == requestId).Symbol;
+            return this.map.Keys.FirstOrDefault(c => c.RequestId == requestId)?.Symbol ?? string.Empty;
         }
 
         public void ChangeStatusForRequest(int requestId, RequestStatus status)

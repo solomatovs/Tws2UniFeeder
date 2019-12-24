@@ -15,11 +15,13 @@ namespace Tws2UniFeeder
         public static async Task Main(string[] args)
         {
             var host = new HostBuilder()
+                .ConfigureHostConfiguration(c => c.AddEnvironmentVariables())
                 .ConfigureAppConfiguration((hostContext, config) =>
                 {
-                    config.SetBasePath(hostContext.HostingEnvironment.ContentRootPath);
+                    config.SetBasePath(Directory.GetCurrentDirectory());
                     config.AddEnvironmentVariables();
                     config.AddJsonFile("appsettings.json", optional: true, reloadOnChange: true);
+                    config.AddJsonFile($"appsettings.dev.json", optional: true, reloadOnChange: true);
                     config.AddCommandLine(args);
                 })
                 .ConfigureLogging((hostContext, logging) =>

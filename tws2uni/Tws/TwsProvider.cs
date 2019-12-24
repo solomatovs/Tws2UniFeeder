@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using IBApi;
 
@@ -17,25 +18,20 @@ namespace Tws2UniFeeder
             this.wrapper = new EWrapperImpl(this.subscription, queue, loggerFactory);
         }
 
-        public void Connect(string host, int port, int clientId)
-        {
-            VConnect(host, port, clientId);
-        }
-
-        private void VConnect(string host, int port, int clientId)
+        public void Connect(string host, int port, int clientId, CancellationToken stoppingToken)
         {
             try
             {
                 wrapper.ClientSocket.eConnect(host, port, clientId);
                 var reader = new EReader(wrapper.ClientSocket, wrapper.signal);
                 reader.Start();
-                StartLoopProcessMsgs(reader);
-                StartSubscribeProcess();
+
+                Task.Run(() => StartLoopProcessMsgs(reader, stoppingToken));
+                Task.Run(() => StartSubscribeProcess(stoppingToken));
             }
             catch (Exception e)
             {
                 logger.LogError(e.Message);
-                throw;
             }
         }
 
@@ -44,17 +40,13 @@ namespace Tws2UniFeeder
             get { return wrapper.ClientSocket.IsConnected(); }
         }
 
-        private void StartLoopProcessMsgs(EReader reader)
+        private void StartLoopProcessMsgs(EReader reader, CancellationToken stoppingToken)
         {
-            new Thread(() =>
+            while (wrapper.ClientSocket.IsConnected() && !stoppingToken.IsCancellationRequested)
             {
-                while (wrapper.ClientSocket.IsConnected())
-                {
-                    wrapper.signal.waitForSignal();
-                    reader.processMsgs();
-                }
-            })
-            { IsBackground = true }.Start();
+                wrapper.signal.waitForSignal();
+                reader.processMsgs();
+            }
         }
 
         public void Disconnect()
@@ -76,23 +68,19 @@ namespace Tws2UniFeeder
             this.subscription.AddSymbol(symbol, contract);
         }
 
-        protected void StartSubscribeProcess()
+        protected void StartSubscribeProcess(CancellationToken stoppingToken)
         {
-            new Thread(() =>
+            while (wrapper.ClientSocket.IsConnected() && !stoppingToken.IsCancellationRequested)
             {
-                while (wrapper.ClientSocket.IsConnected())
+                this.subscription.ForUnsubscribed((mapping, contract) =>
                 {
-                    this.subscription.ForUnsubscribed((mapping, contract) =>
-                    {
-                        wrapper.ClientSocket.reqMktData(mapping.RequestId, contract, string.Empty, false, false, null);
-                        mapping.RequestStatus = RequestStatus.RequestSuccess;
-                        Thread.Sleep(TimeSpan.FromSeconds(1));
-                    });
+                    wrapper.ClientSocket.reqMktData(mapping.RequestId, contract, string.Empty, false, false, null);
+                    mapping.RequestStatus = RequestStatus.RequestSuccess;
+                    Task.Delay(TimeSpan.FromSeconds(1), stoppingToken).ContinueWith(p => { }).Wait();
+                });
 
-                    Thread.Sleep(TimeSpan.FromSeconds(10));
-                }
-            })
-            { IsBackground = true }.Start();
+                Task.Delay(TimeSpan.FromSeconds(2), stoppingToken).ContinueWith(p => { }).Wait();
+            }
         }
     }
 }
