@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Linq;
 using System.Text;
 using Microsoft.Extensions.Logging;
@@ -11,7 +12,8 @@ namespace Tws2UniFeeder
     public class EWrapperImpl : EWrapper
     {
         private readonly SubscriptionDictionary subscription;
-        private readonly IBackgroundQueue<Tick> queue;
+        private readonly ConcurrentDictionary<string, Quote> quotes;
+        private readonly IBackgroundQueue<Quote> queue;
         private readonly ILogger logger;
         //! [ewrapperimpl]
         private int nextOrderId;
@@ -21,13 +23,14 @@ namespace Tws2UniFeeder
         //! [socket_declare]
 
         //! [socket_init]
-        public EWrapperImpl(SubscriptionDictionary subscription, IBackgroundQueue<Tick> queue, ILoggerFactory loggerFactory)
+        public EWrapperImpl(SubscriptionDictionary subscription, IBackgroundQueue<Quote> queue, ILoggerFactory loggerFactory)
         {
             this.subscription = subscription;
             this.logger = loggerFactory.CreateLogger<EWrapperImpl>();
             this.signal = new EReaderMonitorSignal();
             this.clientSocket = new EClientSocket(this, signal);
             this.queue = queue;
+            this.quotes = new ConcurrentDictionary<string, Quote>();
         }
         //! [socket_init]
 
@@ -85,6 +88,9 @@ namespace Tws2UniFeeder
                     case 10190:
                         subscription.ChangeStatusForRequest(id, RequestStatus.RequestFailed);
                         break;
+                    case 10197:
+                        // subscription.ChangeStatusForRequest(id, RequestStatus.RequestSuccess);
+                        break;
                     default:
                         subscription.ChangeStatusForRequest(id, RequestStatus.RequestFailed);
                         // this.ClientSocket.eDisconnect(resetState: true);
@@ -121,16 +127,29 @@ namespace Tws2UniFeeder
         {
             if (field == (int)TickType.BidPrice || field == (int)TickType.AskPrice)
             {
-                queue.QueueBackgroundWorkItem(new Tick
-                {
-                    Symbol = subscription.GetSymbolNameByRequestId(tickerId),
-                    TickType = (TickType)field,
-                    Price = price
-                });
-            }
+                var symbol = subscription.GetSymbolNameByRequestId(tickerId);
+                var tickType = (TickType)field;
 
-            //logger.LogInformation("Tick Price. Ticker Id:" + tickerId + ", Field: " + field + ", Price: " + price + ", CanAutoExecute: " + attribs.CanAutoExecute +
-            //    ", PastLimit: " + attribs.PastLimit + ", PreOpen: " + attribs.PreOpen);
+                quotes.AddOrUpdate(symbol, s => new Quote
+                {
+                    Symbol = symbol,
+                    Ask = tickType == TickType.AskPrice ? price : 0,
+                    Bid = tickType == TickType.BidPrice ? price : 0
+                }, (s, q) => new Quote
+                {
+                    Symbol = symbol,
+                    Ask = tickType == TickType.AskPrice ? price : q.Ask,
+                    Bid = tickType == TickType.BidPrice ? price : q.Bid
+                });
+
+                if (quotes.TryGetValue(symbol, out Quote quote))
+                {
+                    if (quote.IsFilled())
+                    {
+                        queue.QueueBackgroundWorkItem(quote);
+                    }
+                }
+            }
         }
         //! [tickprice]
 

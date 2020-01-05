@@ -11,4 +11,19 @@
             return !(Bid == 0 || Ask == 0);
         }
     }
+
+    public static class QuoteEx
+    {
+        public static bool QuoteEqual(this Quote q, Quote quote)
+        {
+            return 
+                q.Ask == quote.Ask &&
+                q.Bid == quote.Bid;
+        }
+
+        public static bool IsValidQuote(this Quote q)
+        {
+            return q.Ask > 0 && q.Bid > 0;
+        }
+    }
 }

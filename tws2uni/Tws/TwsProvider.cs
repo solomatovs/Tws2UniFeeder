@@ -11,7 +11,7 @@ namespace Tws2UniFeeder
         private readonly ILogger logger;
         private readonly EWrapperImpl wrapper;
         private readonly SubscriptionDictionary subscription;
-        public TwsProvider(IBackgroundQueue<Tick> queue, ILoggerFactory loggerFactory)
+        public TwsProvider(IBackgroundQueue<Quote> queue, ILoggerFactory loggerFactory)
         {
             this.subscription = new SubscriptionDictionary();
             this.logger = loggerFactory.CreateLogger<TwsProvider>();
