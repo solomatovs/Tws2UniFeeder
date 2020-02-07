@@ -136,12 +136,25 @@ namespace Tws2UniFeeder
 
     public static class UniFeederOptionEx
     {
-        public static IList<UniFeederQuote> TranslatesToUniFeederQuotes(this UniFeederOption option)
+        public static IList<UniFeederQuote> TranslatesToUniFeederQuotes(this UniFeederOption option, TwsOption twsOption)
         {
             var r = new List<UniFeederQuote>();
             foreach(var q in option.Translates)
             {
                 r.Add(q);
+            }
+
+            foreach(var q in twsOption.Mapping)
+            {
+                if(!r.Exists(p => p.Symbol == q.Key))
+                {
+                    r.Add(new UniFeederQuote
+                    {
+                        Symbol = q.Key,
+                        Source = q.Key,
+                        Digits = 5,
+                    });
+                }
             }
 
             return r;

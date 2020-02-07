@@ -23,13 +23,13 @@ namespace Tws2UniFeeder
         private readonly ConcurrentBag<UniFeederQuote> quotes;
         private readonly ConcurrentDictionary<int, IRxSocketClient> clients;
 
-        public UniFeedConsumer(IOptions<UniFeederOption> option, IBackgroundQueue<Quote> queue, ILoggerFactory loggerFactory)
+        public UniFeedConsumer(IOptions<UniFeederOption> option, IOptions<TwsOption> twsOption, IBackgroundQueue<Quote> queue, ILoggerFactory loggerFactory)
         {
             this.option = option;
             this.queue = queue;
             this.loggerFactory = loggerFactory;
             this.clients = new ConcurrentDictionary<int, IRxSocketClient>();
-            this.quotes = new ConcurrentBag<UniFeederQuote>(option.Value.TranslatesToUniFeederQuotes());
+            this.quotes = new ConcurrentBag<UniFeederQuote>(option.Value.TranslatesToUniFeederQuotes(twsOption.Value));
             logger = loggerFactory.CreateLogger<UniFeedConsumer>();
         }
 
