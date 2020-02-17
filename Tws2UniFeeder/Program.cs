@@ -26,7 +26,7 @@ namespace Tws2UniFeeder
                 })
                 .ConfigureLogging((hostContext, logging) =>
                 {
-                    logging.AddSerilog((new LoggerConfiguration()).ReadFrom.Configuration(hostContext.Configuration).CreateLogger() , dispose: true);
+                    logging.AddSerilog((new LoggerConfiguration()).ReadFrom.Configuration(hostContext.Configuration).CreateLogger(), dispose: true);
                 })
                 .ConfigureServices((hostContext, services) =>
                 {
