@@ -14,6 +14,7 @@ namespace Tws2UniFeeder
         private readonly SubscriptionDictionary subscription;
         private readonly ConcurrentDictionary<string, Quote> quotes;
         private readonly IBackgroundQueue<Quote> queue;
+        private readonly ITwsProcess tws;
         private readonly ILogger logger;
         //! [ewrapperimpl]
         private int nextOrderId;
@@ -23,10 +24,11 @@ namespace Tws2UniFeeder
         //! [socket_declare]
 
         //! [socket_init]
-        public EWrapperImpl(SubscriptionDictionary subscription, IBackgroundQueue<Quote> queue, ILoggerFactory loggerFactory)
+        public EWrapperImpl(SubscriptionDictionary subscription, IBackgroundQueue<Quote> queue, ITwsProcess tws, ILoggerFactory loggerFactory)
         {
             this.subscription = subscription;
             this.logger = loggerFactory.CreateLogger<EWrapperImpl>();
+            this.tws = tws;
             this.signal = new EReaderMonitorSignal();
             this.clientSocket = new EClientSocket(this, signal);
             this.queue = queue;
@@ -50,14 +52,32 @@ namespace Tws2UniFeeder
 
         public virtual void error(Exception e)
         {
-            logger.LogDebug(e.Message, "Exception thrown: ");
+            logger.LogError("Exception thrown: {0}:{1}", e.GetType().Name, e.Message);
+
+            RestartTwsProcess();
+
             throw e;
         }
 
         public virtual void error(string str)
         {
-            logger.LogError("Error: " + str + "\n");
+            logger.LogError("Interactive Brokers send error: " + str + "\n");
             this.ClientSocket.eDisconnect(resetState: true);
+
+            RestartTwsProcess();
+        }
+
+        private void RestartTwsProcess()
+        {
+            if (tws.TwsProcessIsRunning())
+                logger.LogInformation("TWS Process is running");
+            else
+                logger.LogInformation("TWS Process not running");
+
+            if (!tws.RestartTwsProcess())
+            {
+                logger.LogError("Failed to restart the TVS. Manual restart required");
+            }
         }
 
         //! [error]
@@ -66,33 +86,41 @@ namespace Tws2UniFeeder
             var loggerFormat = "{errorCode} requestId: {id} {symbol}: {errorMsg}";
             if (IsErrorCode(errorCode))
             {
-                logger.LogError(loggerFormat, errorCode, id, subscription.GetSymbolNameByRequestId(id), errorMsg);
+                
                 switch (errorCode)
                 {
                     case 200:
                         subscription.ChangeStatusForRequest(id, RequestStatus.RequestFailed);
+                        logger.LogError(loggerFormat, errorCode, id, subscription.GetSymbolNameByRequestId(id), errorMsg);
                         break;
                     case 354: 
                         subscription.ChangeStatusForRequest(id, RequestStatus.RequestFailed);
+                        logger.LogError(loggerFormat, errorCode, id, subscription.GetSymbolNameByRequestId(id), errorMsg);
                         break;
                     case 502:
                         subscription.ReGenerateRequestIdForSymbol(id);
+                        logger.LogError(loggerFormat, errorCode, id, subscription.GetSymbolNameByRequestId(id), errorMsg);
                         break;
                     case 504:
                         subscription.SetNotRequestedForAllSymbols();
                         this.ClientSocket.eDisconnect(resetState: true);
+                        logger.LogError(loggerFormat, errorCode, id, subscription.GetSymbolNameByRequestId(id), errorMsg);
                         break;
                     case 10168:
                         subscription.ChangeStatusForRequest(id, RequestStatus.RequestFailed);
+                        logger.LogError(loggerFormat, errorCode, id, subscription.GetSymbolNameByRequestId(id), errorMsg);
                         break;
                     case 10190:
                         subscription.ChangeStatusForRequest(id, RequestStatus.RequestFailed);
+                        logger.LogError(loggerFormat, errorCode, id, subscription.GetSymbolNameByRequestId(id), errorMsg);
                         break;
                     case 10197:
                         // subscription.ChangeStatusForRequest(id, RequestStatus.RequestSuccess);
+                        logger.LogError(loggerFormat, errorCode, id, subscription.GetSymbolNameByRequestId(id), errorMsg);
                         break;
                     default:
                         subscription.ChangeStatusForRequest(id, RequestStatus.RequestFailed);
+                        logger.LogError(loggerFormat, errorCode, id, subscription.GetSymbolNameByRequestId(id), errorMsg);
                         // this.ClientSocket.eDisconnect(resetState: true);
                         break;
                 }

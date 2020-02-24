@@ -37,6 +37,7 @@ namespace Tws2UniFeeder
 
                     services.AddSingleton<IBackgroundQueue<Quote>, BackgroundQueue<Quote>>();
                     services.AddSingleton<ITwsProvider, TwsProvider>();
+                    services.AddSingleton<ITwsProcess, TwsProcess>();
 
                     services.AddHostedService<UniFeedConsumer>();
                     services.AddHostedService<TwsProducer>();

@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Diagnostics;
+using System.ComponentModel;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -11,11 +13,11 @@ namespace Tws2UniFeeder
         private readonly ILogger logger;
         private readonly EWrapperImpl wrapper;
         private readonly SubscriptionDictionary subscription;
-        public TwsProvider(IBackgroundQueue<Quote> queue, ILoggerFactory loggerFactory)
+        public TwsProvider(IBackgroundQueue<Quote> queue, ITwsProcess tws, ILoggerFactory loggerFactory)
         {
             this.subscription = new SubscriptionDictionary();
             this.logger = loggerFactory.CreateLogger<TwsProvider>();
-            this.wrapper = new EWrapperImpl(this.subscription, queue, loggerFactory);
+            this.wrapper = new EWrapperImpl(this.subscription, queue, tws, loggerFactory);
         }
 
         public void Connect(string host, int port, int clientId, CancellationToken stoppingToken)

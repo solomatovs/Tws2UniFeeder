@@ -49,6 +49,14 @@ namespace Tws2UniFeeder
         public int Max { get; set; } = -1;
     }
 
+    public static class UniFeederTranslateEx
+    {
+        public static string ToStringTranslates(this UniFeederTranslate t)
+        {
+            return string.Format(CultureInfo.InvariantCulture, "Symbol:{0} Source:{1} Digits:{2} BidMarkup:{3} AskMarkup:{4} Percent:{5} Fix:{6} Min:{7} Max:{8}", t.Symbol, t.Source, t.Digits, t.BidMarkup, t.AskMarkup, t.Percent, t.Fix, t.Min, t.Max);
+        }
+    }
+
     public class UniFeederQuote : UniFeederTranslate
     {
         public double LastBid { get; set; }
@@ -131,6 +139,11 @@ namespace Tws2UniFeeder
         public string ToUniFeederStringFormat()
         {
             return string.Format(CultureInfo.InvariantCulture, "{0} {1} {2}", Symbol, LastBid, LastAsk);
+        }
+
+        public override string ToString()
+        {
+            return string.Format(CultureInfo.InvariantCulture, "{0} ({1} {2})", Symbol, LastBid, LastAsk);
         }
     }
 

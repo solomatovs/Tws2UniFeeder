@@ -15,9 +15,11 @@ namespace Tws2UniFeeder
             this.option = option.Value;
             this.provider = provider;
             this.logger = loggerFactory.CreateLogger<TwsProducer>();
+            // this.process = new TwsProcess(option);
         }
 
         private readonly TwsOption option;
+        // private readonly TwsProcess process;
         private readonly ITwsProvider provider;
         private readonly ILogger logger;
 

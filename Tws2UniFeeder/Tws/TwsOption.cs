@@ -12,6 +12,9 @@ namespace Tws2UniFeeder
         public int Port { get; set; } = 7497;
         public int ClientID { get; set; } = 0;
         public int ReconnectPeriodSecond { get; set; } = 5;
+        public string Path { get; set; } = @"C:\Jts";
+        public string Login { get; set; } = "";
+        public string Password { get; set; } = "";
         public IDictionary<string, Contract> Mapping { get; set; } = new Dictionary<string, Contract>();
     }
 

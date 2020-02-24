@@ -1,4 +1,6 @@
-﻿namespace Tws2UniFeeder
+﻿using System.Globalization;
+
+namespace Tws2UniFeeder
 {
     public class Quote
     {
@@ -9,6 +11,11 @@
         public bool IsFilled()
         {
             return !(Bid == 0 || Ask == 0);
+        }
+
+        public override string ToString()
+        {
+            return string.Format(CultureInfo.InvariantCulture, "{0} ({1} {2})", Symbol, Bid, Ask);
         }
     }
 
