@@ -6,16 +6,67 @@ using IBApi;
 
 namespace Tws2UniFeeder
 {
+    public class TwsWatchDogOption
+    {
+        public string Path { get; set; } = @"C:\Jts";
+        public string Login { get; set; } = "";
+        public string Password { get; set; } = "";
+        public bool Enable { get; set; } = true;
+        public WindowDescription LoginWindow { get; set; } = new WindowDescription
+        {
+            Class = "SunAwtFrame",
+            Header = "Login"
+        };
+        public WindowDescription MainWindow { get; set; } = new WindowDescription
+        {
+            Class = "SunAwtFrame",
+            Header = null
+        };
+        public WindowDescription EnterSecurityCodeWindow { get; set; } = new WindowDescription
+        {
+            Class = "SunAwtDialog",
+            Header = "Enter security code"
+        };
+        public WindowDescription AuthenticatingWindow { get; set; } = new WindowDescription
+        {
+            Class = "SunAwtFrame",
+            Header = "Authenticating..."
+        };
+        public WindowDescription LoginFailedWindow { get; set; } = new WindowDescription
+        {
+            Class = "SunAwtDialog",
+            Header = "Login failed"
+        };
+        public WindowDescription ExistingSessionDetectedWindow { get; set; } = new WindowDescription
+        {
+            Class = "SunAwtDialog",
+            Header = "Existing session detected"
+        };
+        public WindowDescription ReloginIsRequiredWindow { get; set; } = new WindowDescription
+        {
+            Class = "SunAwtDialog",
+            Header = "Re-login is required"
+        };
+        public WindowDescription StartingApplicationWindow { get; set; } = new WindowDescription
+        {
+            Class = "SunAwtFrame",
+            Header = "Starting application..."
+        };
+    }
     public class TwsOption
     {
         public string Host { get; set; } = "127.0.0.1";
         public int Port { get; set; } = 7497;
         public int ClientID { get; set; } = 0;
         public int ReconnectPeriodSecond { get; set; } = 5;
-        public string Path { get; set; } = @"C:\Jts";
-        public string Login { get; set; } = "";
-        public string Password { get; set; } = "";
+        public TwsWatchDogOption WatchDog { get; set; } = new TwsWatchDogOption();
         public IDictionary<string, Contract> Mapping { get; set; } = new Dictionary<string, Contract>();
+    }
+
+    public class WindowDescription
+    {
+        public string Class { get; set; }
+        public string Header { get; set; }
     }
 
     public enum RequestStatus

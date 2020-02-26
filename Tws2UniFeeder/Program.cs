@@ -20,8 +20,8 @@ namespace Tws2UniFeeder
                 {
                     config.SetBasePath(Directory.GetCurrentDirectory());
                     config.AddEnvironmentVariables();
-                    config.AddJsonFile("appsettings.json", optional: true, reloadOnChange: true);
-                    config.AddJsonFile($"appsettings.dev.json", optional: true, reloadOnChange: true);
+                    config.AddJsonFile("appsettings.json",      optional: true, reloadOnChange: true);
+                    config.AddJsonFile("appsettings.dev.json",  optional: true, reloadOnChange: true);
                     config.AddCommandLine(args);
                 })
                 .ConfigureLogging((hostContext, logging) =>
@@ -33,14 +33,14 @@ namespace Tws2UniFeeder
                     services.AddOptions();
 
                     services.Configure<TwsOption>(option => hostContext.Configuration.GetSection("Tws").Bind(option));
+                    services.Configure<TwsWatchDogOption>(option => hostContext.Configuration.GetSection("WatchDog").Bind(option));
                     services.Configure<UniFeederOption>(option => hostContext.Configuration.GetSection("UniFeeder").Bind(option));
 
                     services.AddSingleton<IBackgroundQueue<Quote>, BackgroundQueue<Quote>>();
-                    services.AddSingleton<ITwsProvider, TwsProvider>();
-                    services.AddSingleton<ITwsProcess, TwsProcess>();
 
                     services.AddHostedService<UniFeedConsumer>();
                     services.AddHostedService<TwsProducer>();
+                    services.AddHostedService<TwsWatchDog>();
                 })
                 .Build();
 

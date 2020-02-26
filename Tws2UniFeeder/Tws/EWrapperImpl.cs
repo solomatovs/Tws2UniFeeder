@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Linq;
@@ -14,7 +15,6 @@ namespace Tws2UniFeeder
         private readonly SubscriptionDictionary subscription;
         private readonly ConcurrentDictionary<string, Quote> quotes;
         private readonly IBackgroundQueue<Quote> queue;
-        private readonly ITwsProcess tws;
         private readonly ILogger logger;
         //! [ewrapperimpl]
         private int nextOrderId;
@@ -24,11 +24,10 @@ namespace Tws2UniFeeder
         //! [socket_declare]
 
         //! [socket_init]
-        public EWrapperImpl(SubscriptionDictionary subscription, IBackgroundQueue<Quote> queue, ITwsProcess tws, ILoggerFactory loggerFactory)
+        public EWrapperImpl(SubscriptionDictionary subscription, IBackgroundQueue<Quote> queue, ILoggerFactory loggerFactory)
         {
             this.subscription = subscription;
             this.logger = loggerFactory.CreateLogger<EWrapperImpl>();
-            this.tws = tws;
             this.signal = new EReaderMonitorSignal();
             this.clientSocket = new EClientSocket(this, signal);
             this.queue = queue;
@@ -53,9 +52,6 @@ namespace Tws2UniFeeder
         public virtual void error(Exception e)
         {
             logger.LogError("Exception thrown: {0}:{1}", e.GetType().Name, e.Message);
-
-            RestartTwsProcess();
-
             throw e;
         }
 
@@ -63,21 +59,7 @@ namespace Tws2UniFeeder
         {
             logger.LogError("Interactive Brokers send error: " + str + "\n");
             this.ClientSocket.eDisconnect(resetState: true);
-
-            RestartTwsProcess();
-        }
-
-        private void RestartTwsProcess()
-        {
-            if (tws.TwsProcessIsRunning())
-                logger.LogInformation("TWS Process is running");
-            else
-                logger.LogInformation("TWS Process not running");
-
-            if (!tws.RestartTwsProcess())
-            {
-                logger.LogError("Failed to restart the TVS. Manual restart required");
-            }
+            this.ClientSocket.Close();
         }
 
         //! [error]
