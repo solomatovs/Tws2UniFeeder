@@ -348,4 +348,4 @@ MigrationBackup/
 
 # Ionide (cross platform F# VS Code tools) working folder
 .ionide/
-/Tws2UniFeeder/appsettings.dev.json
+**/*.dev.json
