@@ -3,9 +3,9 @@ using System.Threading.Tasks;
 
 namespace Tws2UniFeeder
 {
-    public interface IBackgroundQueue<T>
+    public interface IBackground<T>
     {
-        void QueueBackgroundWorkItem(T workItem);
+        void AddItem(T workItem);
 
         Task<T> DequeueAsync(CancellationToken cancellationToken);
     }

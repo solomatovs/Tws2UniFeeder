@@ -14,7 +14,8 @@ namespace Tws2UniFeeder
     {
         private readonly SubscriptionDictionary subscription;
         private readonly ConcurrentDictionary<string, Quote> quotes;
-        private readonly IBackgroundQueue<Quote> queue;
+        private readonly IBackground<Quote> queue;
+        private readonly IBackground<string> state;
         private readonly ILogger logger;
         //! [ewrapperimpl]
         private int nextOrderId;
@@ -24,13 +25,14 @@ namespace Tws2UniFeeder
         //! [socket_declare]
 
         //! [socket_init]
-        public EWrapperImpl(SubscriptionDictionary subscription, IBackgroundQueue<Quote> queue, ILoggerFactory loggerFactory)
+        public EWrapperImpl(SubscriptionDictionary subscription, IBackground<Quote> queue, IBackground<string> state, ILoggerFactory loggerFactory)
         {
             this.subscription = subscription;
             this.logger = loggerFactory.CreateLogger<EWrapperImpl>();
             this.signal = new EReaderMonitorSignal();
             this.clientSocket = new EClientSocket(this, signal);
             this.queue = queue;
+            this.state = state;
             this.quotes = new ConcurrentDictionary<string, Quote>();
         }
         //! [socket_init]
@@ -51,12 +53,14 @@ namespace Tws2UniFeeder
 
         public virtual void error(Exception e)
         {
+            state.AddItem(e.Message);
             logger.LogError("Exception thrown: {0}:{1}", e.GetType().Name, e.Message);
             throw e;
         }
 
         public virtual void error(string str)
         {
+            state.AddItem(str);
             logger.LogError("Interactive Brokers send error: " + str + "\n");
             this.ClientSocket.eDisconnect(resetState: true);
             this.ClientSocket.Close();
@@ -156,7 +160,7 @@ namespace Tws2UniFeeder
                 {
                     if (quote.IsFilled())
                     {
-                        queue.QueueBackgroundWorkItem(quote);
+                        queue.AddItem(quote);
                     }
                 }
             }

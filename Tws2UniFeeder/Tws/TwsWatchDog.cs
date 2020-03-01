@@ -7,6 +7,8 @@ using System.Linq;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using WinApi.User32;
+using WinApi.Gdi32;
+using WinApi.Kernel32;
 using Microsoft.Extensions.Hosting;
 using System.Reactive.Linq;
 using System.Threading.Tasks;
@@ -29,12 +31,15 @@ namespace Tws2UniFeeder
 
     public class TwsWatchDog : BackgroundService
     {
-        private string processName = "tws";
+        private readonly string processName = "tws";
         private readonly IOptionsMonitor<TwsWatchDogOption> option;
+        private readonly IBackground<string> state;
+        private int twsErrorMessageCount = 0;
         private readonly ILogger logger;
-        public TwsWatchDog(IOptionsMonitor<TwsWatchDogOption> option, ILoggerFactory loggerFactory)
+        public TwsWatchDog(IOptionsMonitor<TwsWatchDogOption> option, IBackground<string> state, ILoggerFactory loggerFactory)
         {
             this.option = option;
+            this.state = state;
             this.logger = loggerFactory.CreateLogger<TwsWatchDog>();
         }
 
@@ -64,8 +69,13 @@ namespace Tws2UniFeeder
             var start = new ProcessStartInfo(processName)
             {
                 WorkingDirectory = WorkingDirectory(option.CurrentValue),
-                FileName = option.CurrentValue.Path
+                FileName = option.CurrentValue.Path,
+                UseShellExecute = false,
+                Verb = "runas",
+                WindowStyle = ProcessWindowStyle.Normal
             };
+
+            logger.LogDebug("FileName {0}, FileName {1}, UseShellExecute {2}, CreateNoWindow {3}, RedirectStandardOutput {4}, RedirectStandardInput {5}, Arguments {6}, WorkingDirectory {7}, UserName {8}", start.FileName, start.FileName, start.UseShellExecute, start.CreateNoWindow, start.RedirectStandardOutput, start.RedirectStandardInput, start.Arguments, start.WorkingDirectory, start.UserName);
 
             return Process.Start(start);
         }
@@ -107,6 +117,98 @@ namespace Tws2UniFeeder
             return true;
         }
 
+        private (TwsWindowStatus, IntPtr) TwsWindowState(Process process, TwsWatchDogOption option)
+        {
+            process.Refresh();
+
+            var MainWindow = process.MainWindowHandle;
+            if (MainWindow == IntPtr.Zero)
+                return (TwsWindowStatus.MainWindowIsNotDrawn, IntPtr.Zero);
+
+            IntPtr LoginWindow;
+            if (process.MainWindowTitle == option.LoginWindow.Header)
+                LoginWindow = process.MainWindowHandle;
+            else
+                LoginWindow = User32Methods.FindWindow(option.LoginWindow.Class, option.LoginWindow.Header);
+
+            IntPtr AuthenticatingWindow;
+            if (process.MainWindowTitle == option.AuthenticatingWindow.Header)
+                AuthenticatingWindow = process.MainWindowHandle;
+            else
+                AuthenticatingWindow = User32Methods.FindWindow(option.AuthenticatingWindow.Class, option.AuthenticatingWindow.Header);
+
+            IntPtr StartingApplicationWindow;
+            if (process.MainWindowTitle == option.StartingApplicationWindow.Header)
+                StartingApplicationWindow = process.MainWindowHandle;
+            else
+                StartingApplicationWindow = User32Methods.FindWindow(option.StartingApplicationWindow.Class, option.StartingApplicationWindow.Header);
+
+            var EnterSecurityCodeWindow = User32Methods.FindWindow(option.EnterSecurityCodeWindow.Class, option.EnterSecurityCodeWindow.Header);
+            var LoginFailedWindow = User32Methods.FindWindow(option.LoginFailedWindow.Class, option.LoginFailedWindow.Header);
+            var ExistingSessionDetectedWindow = User32Methods.FindWindow(option.ExistingSessionDetectedWindow.Class, option.ExistingSessionDetectedWindow.Header);
+            var ReloginIsRequiredWindow = User32Methods.FindWindow(option.ReloginIsRequiredWindow.Class, option.ReloginIsRequiredWindow.Header);
+
+            logger.LogDebug("MainWindow: {0}, LoginWindow: {1}, AuthenticatingWindow: {2}, StartingApplicationWindow: {3}, EnterSecurityCodeWindow: {4}, LoginFailedWindow: {5}, ExistingSessionDetectedWindow: {6}, ReloginIsRequiredWindow: {7}", MainWindow, LoginWindow, AuthenticatingWindow, StartingApplicationWindow, EnterSecurityCodeWindow, LoginFailedWindow, ExistingSessionDetectedWindow, ReloginIsRequiredWindow);
+
+            // Если есть окно процесса аутентификации, то необходимо проверить наличие других окон
+            if (LoginFailedWindow != IntPtr.Zero)
+            {
+                return (TwsWindowStatus.AuthentificateFailed, LoginFailedWindow);
+            }
+
+            // Ппоявилось окно ввода дополнительной авторизации
+            if (EnterSecurityCodeWindow != IntPtr.Zero)
+            {
+                return (TwsWindowStatus.EnterSecurityCode, EnterSecurityCodeWindow);
+            }
+
+            // Появилось окно с сообщением о том, что уже залогинен другой пользователь
+            if (ExistingSessionDetectedWindow != IntPtr.Zero)
+            {
+                return (TwsWindowStatus.EnterSecurityCode, ExistingSessionDetectedWindow);
+            }
+
+            // Вылезло окно с сообщение о том, что нужно произвести авторизацию заново
+            if (ReloginIsRequiredWindow != IntPtr.Zero)
+            {
+                return (TwsWindowStatus.ReloginIsRequired, ReloginIsRequiredWindow);
+            }
+
+            // происходит процесс загрузки приложения после успешной авторизации
+            if (StartingApplicationWindow != IntPtr.Zero)
+            {
+                return (TwsWindowStatus.StartingApplication, StartingApplicationWindow);
+            }
+
+            // Происходит процесс аутентификации после ввода логина с паролем
+            if (AuthenticatingWindow != IntPtr.Zero)
+            {
+                return (TwsWindowStatus.AuthentificateProcess, AuthenticatingWindow);
+            }
+
+            // Если есть окно Login и нет окна процесса авторизации, значит терминал ждёт ввода логина с паролем
+            if (LoginWindow != IntPtr.Zero)
+            {
+                // Если нет процесса авторизации, значит терминал запросил логин с паролем
+                if (AuthenticatingWindow == IntPtr.Zero)
+                {
+                    return (TwsWindowStatus.LoginInput, LoginWindow);
+                }
+                else
+                {
+                    return (TwsWindowStatus.AuthentificateProcess, AuthenticatingWindow);
+                }
+            }
+            else
+            {
+                if (process.MainWindowHandle != IntPtr.Zero)
+                    return (TwsWindowStatus.Success, process.MainWindowHandle);
+            }
+
+            // Статус терминала неизвестен
+            return (TwsWindowStatus.UnknownStatus, IntPtr.Zero);
+        }
+
         private void AutoProcessWindowTws(TwsWatchDogOption option)
         {
             var processs = SearchTwsProcess();
@@ -133,50 +235,51 @@ namespace Tws2UniFeeder
                 }
             }
 
-            int i = 1; int loginInputRepeatMax = 3;
             foreach (var process in processs)
-            switch (process.TwsWindowState(option))
             {
-                case TwsWindowStatus.EnterSecurityCode:
-                    InputHelper.SendEnterSecurityCode();
-                    break;
-                case TwsWindowStatus.AuthentificateFailed:
-                    logger.LogError("Automatic authorization error. Please sign in manually");
-                    RestartTwsProcess();
-                    break;
-                case TwsWindowStatus.AuthentificateProcess:
-                    logger.LogInformation("Authentificating waitng... iterate {0}", i);
-                    break;
-                case TwsWindowStatus.StartingApplication:
-                    logger.LogInformation("Starting application waiting... iterate {0}", i);
-                    break;
-                case TwsWindowStatus.LoginInput:
-                    InputHelper.SendLoginAndPassword(option.Login, option.Password);
-                    loginInputRepeatMax--;
-                    if (loginInputRepeatMax < 0)
-                    {
-                        logger.LogInformation("Multiple failed authorization attempts. trying to restart TWS");
+                var state = TwsWindowState(process, option);
+                switch (state.Item1)
+                {
+                    case TwsWindowStatus.EnterSecurityCode:
+                        InputHelper.SendEnterSecurityCode(state.Item2);
+                        break;
+                    case TwsWindowStatus.AuthentificateFailed:
+                        logger.LogError("Automatic authorization error. Please sign in manually");
                         RestartTwsProcess();
-                        return;
-                    }
-                    break;
-                case TwsWindowStatus.ReloginIsRequired:
-                    RestartTwsProcess();
-                        // InputHelper.SendExitApplicationFromReloginForm();
-                    return;
-                case TwsWindowStatus.ExistingSessionDetected:
-                        // InputHelper.SendExitApplicationExistingSessionDetectedForm();
-                    RestartTwsProcess();
-                        return;
-                case TwsWindowStatus.Success:
-                    //logger.LogDebug("Tws Window Success");
-                    break;
-                case TwsWindowStatus.MainWindowIsNotDrawn:
-                    logger.LogInformation("Waiting main window... iterate {0}", i);
-                    break;
-                default:
-                    logger.LogError("Unwnown Tws Window status. Failed authentification. Please log in manually");
-                    break;
+                        break;
+                    case TwsWindowStatus.AuthentificateProcess:
+                        logger.LogInformation("Authentificating waitng...");
+                        break;
+                    case TwsWindowStatus.StartingApplication:
+                        logger.LogInformation("Starting application waiting...");
+                        break;
+                    case TwsWindowStatus.LoginInput:
+                        WindowInfo pwi = new WindowInfo();
+                        User32Methods.GetWindowInfo(state.Item2, ref pwi);
+                        logger.LogDebug("type: {1}, status: {2}, rect: {3}, style: {4}, exstyle: {5}", pwi.WindowType, pwi.WindowStatus, pwi.WindowRect, pwi.Styles, pwi.ExStyles);
+
+                        InputHelper.SendLoginAndPassword(state.Item2, option.Login, option.Password, logger);
+                        break;
+                    case TwsWindowStatus.ReloginIsRequired:
+                        // RestartTwsProcess();
+                        InputHelper.SendExitApplicationFromReloginForm();
+                        // return;
+                        break;
+                    case TwsWindowStatus.ExistingSessionDetected:
+                        InputHelper.SendExitApplicationExistingSessionDetectedForm();
+                        // RestartTwsProcess();
+                        // return;
+                        break;
+                    case TwsWindowStatus.Success:
+                        //logger.LogDebug("Tws Window Success");
+                        break;
+                    case TwsWindowStatus.MainWindowIsNotDrawn:
+                        logger.LogInformation("Waiting main window...");
+                        break;
+                    default:
+                        logger.LogError("Unwnown Tws Window status. Failed authentification. Please log in manually");
+                        break;
+                }
             }
 
             Thread.Sleep(TimeSpan.FromSeconds(2));
@@ -190,7 +293,35 @@ namespace Tws2UniFeeder
                 while (!token.IsCancellationRequested)
                 {
                     if (option.CurrentValue.Enable)
+                    {
                         AutoProcessWindowTws(option.CurrentValue);
+                    }
+                }
+            })
+            { IsBackground = true }.Start();
+            new Thread(async () =>
+            {
+                while (!token.IsCancellationRequested)
+                {
+                    if (option.CurrentValue.Enable)
+                    {
+                        try
+                        {
+                            var message_error = await state.DequeueAsync(token);
+                            twsErrorMessageCount++;
+                            logger.LogInformation("tws error count {0}, message:  {1}", twsErrorMessageCount, message_error);
+
+                            if (twsErrorMessageCount >= option.CurrentValue.CriticalErrorMessageBeforeRestart)
+                            {
+                                if (RestartTwsProcess())
+                                {
+                                    twsErrorMessageCount = 0;
+                                }
+                            }
+                        }
+                        catch
+                        { }
+                    }
                 }
             })
             { IsBackground = true }.Start();
@@ -234,6 +365,18 @@ namespace Tws2UniFeeder
             Input.InitKeyboardInput(out Input a_up, VirtualKey.A, true);
             return inputs.Append(down).Append(a_down).Append(up).Append(a_up);
         }
+        public static IEnumerable<Input> AddMouseMove(this IEnumerable<Input> inputs, int x, int y)
+        {
+            Input.InitMouseInput(out Input move, x, y, MouseInputFlags.MOUSEEVENTF_ABSOLUTE | MouseInputFlags.MOUSEEVENTF_MOVE);
+            return inputs.Append(move);
+        }
+
+        public static IEnumerable<Input> AddMouseClick(this IEnumerable<Input> inputs, int x, int y)
+        {
+            Input.InitMouseInput(out Input down, x, y, MouseInputFlags.MOUSEEVENTF_LEFTDOWN);
+            Input.InitMouseInput(out Input up, x, y, MouseInputFlags.MOUSEEVENTF_LEFTUP);
+            return inputs.Append(down).Append(up);
+        }
 
         public static IEnumerable<Input> AddDelete(this IEnumerable<Input> inputs)
         {
@@ -256,155 +399,87 @@ namespace Tws2UniFeeder
             return new List<Input>();
         }
 
-        internal static TwsWindowStatus TwsWindowState(this Process process, TwsWatchDogOption option)
-        {
-            process.Refresh();
-
-            var MainWindow = process.MainWindowHandle;
-            if (MainWindow == IntPtr.Zero)
-                return TwsWindowStatus.MainWindowIsNotDrawn;
-
-            IntPtr LoginWindow;
-            if (process.MainWindowTitle == option.LoginWindow.Header)
-                LoginWindow = process.MainWindowHandle;
-            else
-                LoginWindow = User32Methods.FindWindow(option.LoginWindow.Class, option.LoginWindow.Header);
-
-            IntPtr AuthenticatingWindow;
-            if (process.MainWindowTitle == option.AuthenticatingWindow.Header)
-                AuthenticatingWindow = process.MainWindowHandle;
-            else
-                AuthenticatingWindow = User32Methods.FindWindow(option.AuthenticatingWindow.Class, option.AuthenticatingWindow.Header);
-
-            IntPtr StartingApplicationWindow;
-            if (process.MainWindowTitle == option.StartingApplicationWindow.Header)
-                StartingApplicationWindow = process.MainWindowHandle;
-            else
-                StartingApplicationWindow = User32Methods.FindWindow(option.StartingApplicationWindow.Class, option.StartingApplicationWindow.Header);
-
-            var EnterSecurityCodeWindow = User32Methods.FindWindow(option.EnterSecurityCodeWindow.Class, option.EnterSecurityCodeWindow.Header);
-            var LoginFailedWindow = User32Methods.FindWindow(option.LoginFailedWindow.Class, option.LoginFailedWindow.Header);
-            var ExistingSessionDetectedWindow = User32Methods.FindWindow(option.ExistingSessionDetectedWindow.Class, option.ExistingSessionDetectedWindow.Header);
-            var ReloginIsRequiredWindow = User32Methods.FindWindow(option.ReloginIsRequiredWindow.Class, option.ReloginIsRequiredWindow.Header);
-
-            // Если есть окно процесса аутентификации, то необходимо проверить наличие других окон
-            if (LoginFailedWindow != IntPtr.Zero)
-                return TwsWindowStatus.AuthentificateFailed;
-
-            // Ппоявилось окно ввода дополнительной авторизации
-            if (EnterSecurityCodeWindow != IntPtr.Zero)
-            {
-                User32Methods.SetForegroundWindow(EnterSecurityCodeWindow);
-                return TwsWindowStatus.EnterSecurityCode;
-            }
-
-            // Появилось окно с сообщением о том, что уже залогинен другой пользователь
-            if (ExistingSessionDetectedWindow != IntPtr.Zero)
-            {
-                User32Methods.SetForegroundWindow(ExistingSessionDetectedWindow);
-                return TwsWindowStatus.EnterSecurityCode;
-            }
-
-            // Вылезло окно с сообщение о том, что нужно произвести авторизацию заново
-            if (ReloginIsRequiredWindow != IntPtr.Zero)
-            {
-                User32Methods.SetForegroundWindow(ReloginIsRequiredWindow);
-                return TwsWindowStatus.ReloginIsRequired;
-            }
-
-            // происходит процесс загрузки приложения после успешной авторизации
-            if (StartingApplicationWindow != IntPtr.Zero)
-            {
-                return TwsWindowStatus.StartingApplication;
-            }
-
-            // Происходит процесс аутентификации после ввода логина с паролем
-            if (AuthenticatingWindow != IntPtr.Zero)
-            {
-                return TwsWindowStatus.AuthentificateProcess;
-            }
-
-            // Если есть окно Login и нет окна процесса авторизации, значит терминал ждёт ввода логина с паролем
-            if (LoginWindow != IntPtr.Zero)
-            {
-                // Если нет процесса авторизации, значит терминал запросил логин с паролем
-                if (AuthenticatingWindow == IntPtr.Zero)
-                {
-                    User32Methods.SetForegroundWindow(LoginWindow);
-                    return TwsWindowStatus.LoginInput;
-                }
-                    
-                else
-                    return TwsWindowStatus.AuthentificateProcess;
-            }
-            else
-            {
-                if (process.MainWindowHandle != IntPtr.Zero)
-                    return TwsWindowStatus.Success;
-            }
-
-            // Статус терминала неизвестен
-            return TwsWindowStatus.UnknownStatus;
-        }
-
         // Отправка сообщений с кодом авторизации
-        public static void SendEnterSecurityCode()
+        public static void SendEnterSecurityCode(IntPtr window)
         {
-            GenerateInput()
-            .AddTab()
-            .Send(TimeSpan.FromSeconds(1));
+            WindowInfo pwi = new WindowInfo();
+            User32Methods.GetWindowInfo(window, ref pwi);
+
+            int x = pwi.WindowRect.Left + (pwi.WindowRect.Width * 50 / 100);
+            int y = pwi.WindowRect.Top + (pwi.WindowRect.Height * 70 / 100);
+
+            User32Methods.SetForegroundWindow(window);
+            User32Methods.ShowWindow(window, ShowWindowCommands.SW_RESTORE);
+            User32Methods.SetCursorPos(x, y);
 
             GenerateInput()
-            .AddTab()
-            .Send(TimeSpan.FromSeconds(1));
-
-            GenerateInput()
-            .AddSpace()
+            .AddMouseClick(0, 0)
             .Send(TimeSpan.FromSeconds(1));
         }
 
-        public static void SendLoginAndPassword(string login, string password)
+        // Ввод данных логина с паролем от TWS счета
+        public static void SendLoginAndPassword(IntPtr window, string login, string password, ILogger logger)
         {
-            // Ввод данных логина с паролем от TWS счета
+            WindowInfo pwi = new WindowInfo();
+            User32Methods.GetWindowInfo(window, ref pwi);
+
+            int x = pwi.WindowRect.Left + (pwi.WindowRect.Width * 50 / 100);
+            int y = pwi.WindowRect.Top + (pwi.WindowRect.Height * 47 / 100);
+
+            User32Methods.ShowCursor(true);
+
+            if(!User32Methods.SetForegroundWindow(window))
+            {
+                var err = Kernel32Methods.GetLastError();
+                logger.LogDebug("SetForegroundWindow error {0}", err);
+            }
+            ;
+            if (!User32Methods.ShowWindow(window, ShowWindowCommands.SW_RESTORE))
+            {
+                var err = Kernel32Methods.GetLastError();
+                logger.LogDebug("ShowWindow error {0}", err);
+            }
+            if (!User32Methods.SetCursorPos(x, y))
+            {
+                var err = Kernel32Methods.GetLastError();
+                logger.LogDebug("SetCursorPos error {0}", err);
+            }
+
             GenerateInput()
-            .AddCtrlPlusA()
-            .Send(TimeSpan.FromSeconds(1));
-            
-            GenerateInput()
-            .AddDelete()
+            .AddMouseClick(0, 0)
+            .AddMouseClick(0, 0)
             .Send(TimeSpan.FromSeconds(1));
 
             GenerateInput()
             .AddText(login)
             .Send(TimeSpan.FromSeconds(1));
 
-            GenerateInput()
-            .AddTab()
-            .Send(TimeSpan.FromSeconds(1));
+            x = pwi.WindowRect.Left + (pwi.WindowRect.Width * 50 / 100);
+            y = pwi.WindowRect.Top + (pwi.WindowRect.Height * 54 / 100);
+
+            User32Methods.SetForegroundWindow(window);
+            User32Methods.ShowWindow(window, ShowWindowCommands.SW_RESTORE);
+            User32Methods.SetCursorPos(x, y);
 
             GenerateInput()
-            .AddCtrlPlusA()
-            .Send(TimeSpan.FromSeconds(1));
-
-            GenerateInput()
-            .AddDelete()
+            .AddMouseClick(0, 0)
+            .AddMouseClick(0, 0)
             .Send(TimeSpan.FromSeconds(1));
 
             GenerateInput()
             .AddText(password)
             .Send(TimeSpan.FromSeconds(1));
 
-            GenerateInput()
-            .AddTab()
-            .Send(TimeSpan.FromSeconds(1));
+            x = pwi.WindowRect.Left + (pwi.WindowRect.Width * 50 / 100);
+            y = pwi.WindowRect.Top + (pwi.WindowRect.Height * 73 / 100);
+
+            User32Methods.SetForegroundWindow(window);
+            User32Methods.ShowWindow(window, ShowWindowCommands.SW_RESTORE);
+            User32Methods.SetCursorPos(x, y);
 
             GenerateInput()
-            .AddTab()
-            .Send(TimeSpan.FromSeconds(1));
-
-            GenerateInput()
-            .AddSpace()
-            .Send(TimeSpan.FromSeconds(1));
+            .AddMouseClick(0, 0)
+            .Send(TimeSpan.FromSeconds(0));
         }
 
         public static void SendExitApplicationFromReloginForm()

@@ -12,6 +12,7 @@ namespace Tws2UniFeeder
         public string Login { get; set; } = "";
         public string Password { get; set; } = "";
         public bool Enable { get; set; } = true;
+        public int CriticalErrorMessageBeforeRestart { get; set; } = 50;
         public WindowDescription LoginWindow { get; set; } = new WindowDescription
         {
             Class = "SunAwtFrame",

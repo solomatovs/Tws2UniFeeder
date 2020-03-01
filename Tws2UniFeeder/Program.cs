@@ -36,7 +36,8 @@ namespace Tws2UniFeeder
                     services.Configure<TwsWatchDogOption>(option => hostContext.Configuration.GetSection("WatchDog").Bind(option));
                     services.Configure<UniFeederOption>(option => hostContext.Configuration.GetSection("UniFeeder").Bind(option));
 
-                    services.AddSingleton<IBackgroundQueue<Quote>, BackgroundQueue<Quote>>();
+                    services.AddSingleton<IBackground<Quote>,   BackgroundQueue<Quote>>();
+                    services.AddSingleton<IBackground<string>,  BackgroundQueue<string>>();
 
                     services.AddHostedService<UniFeedConsumer>();
                     services.AddHostedService<TwsProducer>();

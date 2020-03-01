@@ -5,12 +5,12 @@ using System.Collections.Concurrent;
 
 namespace Tws2UniFeeder
 {
-    public class BackgroundQueue<T> : IBackgroundQueue<T>
+    public class BackgroundQueue<T> : IBackground<T>
     {
         private readonly ConcurrentQueue<T> workItems = new ConcurrentQueue<T>();
         private readonly SemaphoreSlim signal = new SemaphoreSlim(0);
 
-        public void QueueBackgroundWorkItem(T workItem)
+        public void AddItem(T workItem)
         {
             if (workItem == null)
             {

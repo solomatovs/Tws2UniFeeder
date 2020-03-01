@@ -10,18 +10,20 @@ namespace Tws2UniFeeder
 {
     class TwsProducer : BackgroundService
     {
-        public TwsProducer(IOptions<TwsOption> option, IBackgroundQueue<Quote> queue, ILoggerFactory loggerFactory)
+        public TwsProducer(IOptions<TwsOption> option, IBackground<Quote> queue, IBackground<string> state, ILoggerFactory loggerFactory)
         {
             this.option = option.Value;
             this.subscription = new SubscriptionDictionary();
             this.queue = queue;
+            this.state = state;
             this.loggerFactory = loggerFactory;
             this.logger = loggerFactory.CreateLogger<TwsProducer>();
         }
 
         private readonly TwsOption option;
         private readonly SubscriptionDictionary subscription;
-        private readonly IBackgroundQueue<Quote> queue;
+        private readonly IBackground<Quote> queue;
+        private readonly IBackground<string> state;
         private readonly ILoggerFactory loggerFactory;
         private readonly ILogger logger;
 
@@ -50,7 +52,7 @@ namespace Tws2UniFeeder
                 foreach (var contract in option.Mapping)
                     subscription.AddSymbol(contract.Key, contract.Value);
 
-                var wrapper = new EWrapperImpl(subscription, queue, loggerFactory);
+                var wrapper = new EWrapperImpl(subscription, queue, state, loggerFactory);
 
                 logger.LogDebug("Connecting to {0}:{1} ...", option.Host, option.Port);
                 wrapper.ClientSocket.eConnect(host, port, clientId);

@@ -19,12 +19,12 @@ namespace Tws2UniFeeder
         private readonly IOptions<UniFeederOption> option;
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
-        private readonly IBackgroundQueue<Quote> queue;
+        private readonly IBackground<Quote> queue;
         private IRxSocketServer server;
         private readonly ConcurrentBag<UniFeederQuote> quotes;
         private readonly ConcurrentDictionary<int, IRxSocketClient> clients;
 
-        public UniFeedConsumer(IOptions<UniFeederOption> option, IOptions<TwsOption> twsOption, IBackgroundQueue<Quote> queue, ILoggerFactory loggerFactory)
+        public UniFeedConsumer(IOptions<UniFeederOption> option, IOptions<TwsOption> twsOption, IBackground<Quote> queue, ILoggerFactory loggerFactory)
         {
             this.option = option;
             this.queue = queue;
