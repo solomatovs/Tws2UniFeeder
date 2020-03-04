@@ -75,7 +75,7 @@ namespace Tws2UniFeeder
                 WindowStyle = ProcessWindowStyle.Normal
             };
 
-            logger.LogDebug("FileName {0}, FileName {1}, UseShellExecute {2}, CreateNoWindow {3}, RedirectStandardOutput {4}, RedirectStandardInput {5}, Arguments {6}, WorkingDirectory {7}, UserName {8}", start.FileName, start.FileName, start.UseShellExecute, start.CreateNoWindow, start.RedirectStandardOutput, start.RedirectStandardInput, start.Arguments, start.WorkingDirectory, start.UserName);
+            logger.LogDebug("FileName {0}, UseShellExecute {1}, CreateNoWindow {2}, RedirectStandardOutput {3}, RedirectStandardInput {4}, Arguments {5}, WorkingDirectory {6}, UserName {7}", start.FileName, start.UseShellExecute, start.CreateNoWindow, start.RedirectStandardOutput, start.RedirectStandardInput, start.Arguments, start.WorkingDirectory, start.UserName);
 
             return Process.Start(start);
         }

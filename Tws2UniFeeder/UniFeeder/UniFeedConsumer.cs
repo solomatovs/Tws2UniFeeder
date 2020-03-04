@@ -147,7 +147,7 @@ namespace Tws2UniFeeder
                                 else
                                 switch (message)
                                 {
-                                    case "> Ping": "> Ping".ToUniFeederByteArray().SendTo(accept); logger.LogInformation("send Ping to client {0}", clientId); break;
+                                    case "> Ping": "> Ping".ToUniFeederByteArray().SendTo(accept); logger.LogDebug("send Ping to client {0}", clientId); break;
                                     default: break;
                                 }
                             }
@@ -160,17 +160,21 @@ namespace Tws2UniFeeder
                     },
                     onError: e =>
                     {
-                        if (clients.TryRemove(clientId, out IRxSocketClient client))
+                        var i = 5;
+                        while (clients.TryRemove(clientId, out IRxSocketClient client) && i > 0)
                         {
                             client.Dispose();
+                            i--;
                         }
                         logger.LogError("client: {0} rxsocket error {1}. client disposed. current clients: {2}", clientId, e.Message, clients.Count);
                     },
                     onCompleted: () =>
                     {
-                        if (clients.TryRemove(clientId, out IRxSocketClient client))
+                        var i = 5;
+                        while (clients.TryRemove(clientId, out IRxSocketClient client) && i > 0)
                         {
                             client.Dispose();
+                            i--;
                         }
                         logger.LogInformation("client: {0} rxsocket complited. client disposed. current clients: {1}", clientId, clients.Count);
                     }
