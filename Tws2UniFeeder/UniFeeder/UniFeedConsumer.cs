@@ -122,7 +122,7 @@ namespace Tws2UniFeeder
                 accept.ReceiveObservable.ToUniFeederStrings().Subscribe(
                     onNext: message =>
                     {
-                        logger.LogInformation("client: {0} receive message: {1}", clientId, message);
+                        logger.LogDebug("client: {0} receive message: {1}", clientId, message);
 
                         if (!clients.ContainsKey(clientId) && DateTimeOffset.UtcNow >= ended)
                         {
