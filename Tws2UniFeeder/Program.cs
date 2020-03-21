@@ -1,12 +1,10 @@
-﻿using System;
-using System.IO;
+﻿using System.IO;
+using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using Serilog;
-using Serilog.Configuration;
 
 namespace Tws2UniFeeder
 {
@@ -19,9 +17,10 @@ namespace Tws2UniFeeder
                 .ConfigureAppConfiguration((hostContext, config) =>
                 {
                     config.SetBasePath(Directory.GetCurrentDirectory());
-                    config.AddEnvironmentVariables();
                     config.AddJsonFile("appsettings.json",      optional: true, reloadOnChange: true);
                     config.AddJsonFile("appsettings.dev.json",  optional: true, reloadOnChange: true);
+                    config.AddEnvironmentVariables();
+                    config.AddUserSecrets(assembly: Assembly.GetExecutingAssembly(), optional: true, reloadOnChange: true);
                     config.AddCommandLine(args);
                 })
                 .ConfigureLogging((hostContext, logging) =>

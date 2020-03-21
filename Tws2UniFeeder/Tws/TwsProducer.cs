@@ -10,22 +10,26 @@ namespace Tws2UniFeeder
 {
     class TwsProducer : BackgroundService
     {
+        private readonly IOptions<TwsOption> option;
+        private readonly SubscriptionDictionary subscription;
+        private readonly IBackground<Quote> queue;
+        private readonly IBackground<string> state;
+        private readonly Timer addNewSubscription;
+        private readonly ILoggerFactory loggerFactory;
+        private readonly ILogger logger;
+
         public TwsProducer(IOptions<TwsOption> option, IBackground<Quote> queue, IBackground<string> state, ILoggerFactory loggerFactory)
         {
-            this.option = option.Value;
+            this.option = option;
             this.subscription = new SubscriptionDictionary();
             this.queue = queue;
             this.state = state;
+            this.addNewSubscription = new Timer(new TimerCallback(o => AddNewSubscribtion()), null, TimeSpan.FromSeconds(0), TimeSpan.FromSeconds(10));
             this.loggerFactory = loggerFactory;
             this.logger = loggerFactory.CreateLogger<TwsProducer>();
         }
 
-        private readonly TwsOption option;
-        private readonly SubscriptionDictionary subscription;
-        private readonly IBackground<Quote> queue;
-        private readonly IBackground<string> state;
-        private readonly ILoggerFactory loggerFactory;
-        private readonly ILogger logger;
+        private TwsOption Option => option.Value;
 
         protected override async Task ExecuteAsync(CancellationToken token)
         {
@@ -34,7 +38,7 @@ namespace Tws2UniFeeder
             {
                 while (!token.IsCancellationRequested)
                 {
-                    StartLoopProcess(option.Host, option.Port, option.ClientID, token);
+                    StartLoopProcess(token);
                 }
             })
             { IsBackground = true }.Start();
@@ -44,26 +48,25 @@ namespace Tws2UniFeeder
             logger.LogInformation("TwsProducer started");
         }
 
-        private void StartLoopProcess(string host, int port, int clientId, CancellationToken token)
+        private void StartLoopProcess(CancellationToken token)
         {
             try
             {
                 logger.LogDebug("Starting connection TWS...");
-                foreach (var contract in option.Mapping)
-                    subscription.AddSymbol(contract.Key, contract.Value);
+                AddNewSubscribtion();
 
                 var wrapper = new EWrapperImpl(subscription, queue, state, loggerFactory);
 
-                logger.LogDebug("Connecting to {0}:{1} ...", option.Host, option.Port);
-                wrapper.ClientSocket.eConnect(host, port, clientId);
+                logger.LogDebug("Connecting to {0}:{1} ...", Option.Host, Option.Port);
+                wrapper.ClientSocket.eConnect(Option.Host, Option.Port, Option.ClientID);
 
                 while (!wrapper.ClientSocket.IsConnected() && !token.IsCancellationRequested)
                 {
-                    logger.LogDebug("Waiting connection to {0}:{1}", option.Host, option.Port);
+                    logger.LogDebug("Waiting connection to {0}:{1}", Option.Host, Option.Port);
                     Thread.Sleep(TimeSpan.FromSeconds(1));
                 }
 
-                logger.LogInformation("Successfully connected to {0}:{1} ...", option.Host, option.Port);
+                logger.LogInformation("Successfully connected to {0}:{1} ...", Option.Host, Option.Port);
 
                 var reader = new EReader(wrapper.ClientSocket, wrapper.signal); reader.Start();
 
@@ -71,10 +74,10 @@ namespace Tws2UniFeeder
 
                 StartLoopProcessMsgs(wrapper, reader, token);
 
-                logger.LogDebug("Disconnecting to TWS {0}:{1}", option.Host, option.Port);
+                logger.LogDebug("Disconnecting to TWS {0}:{1}", Option.Host, Option.Port);
                 wrapper.ClientSocket.eDisconnect();
                 wrapper.ClientSocket.Close();
-                logger.LogInformation("Successfully disconnected {0}:{1} ...", option.Host, option.Port);
+                logger.LogInformation("Successfully disconnected {0}:{1} ...", Option.Host, Option.Port);
             }
             catch (Exception e)
             {
@@ -109,6 +112,14 @@ namespace Tws2UniFeeder
                 });
 
                 Thread.Sleep(TimeSpan.FromSeconds(2));
+            }
+        }
+
+        private void AddNewSubscribtion()
+        {
+            foreach (var contract in Option.Mapping)
+            {
+                subscription.AddSymbolIfNotExists(contract.Key, contract.Value);
             }
         }
     }

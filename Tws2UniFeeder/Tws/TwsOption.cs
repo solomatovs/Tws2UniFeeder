@@ -96,7 +96,7 @@ namespace Tws2UniFeeder
         {
             foreach (var m in map)
             {
-                AddSymbol(m.Key, m.Value);
+                AddSymbolIfNotExists(m.Key, m.Value);
             }
         }
 
@@ -116,7 +116,7 @@ namespace Tws2UniFeeder
             }
         }
 
-        public void AddSymbol(string name, Contract symbol)
+        public void AddSymbolIfNotExists(string name, Contract symbol)
         {
             var predicate = new KeyValuePair<Mapping, Contract>(new Mapping
             {
