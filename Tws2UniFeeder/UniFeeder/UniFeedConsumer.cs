@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Collections.Concurrent;
 using System.Globalization;
+using System.Collections.Generic;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -18,7 +19,6 @@ namespace Tws2UniFeeder
     {
         private readonly IOptions<UniFeederOption> option;
         private readonly ILogger logger;
-        private readonly ILoggerFactory loggerFactory;
         private readonly IBackground<Quote> queue;
         private IRxSocketServer server;
         private readonly ConcurrentBag<UniFeederQuote> quotes;
@@ -28,8 +28,6 @@ namespace Tws2UniFeeder
         {
             this.option = option;
             this.queue = queue;
-            this.loggerFactory = loggerFactory;
-
             this.clients = new ConcurrentDictionary<int, IRxSocketClient>();
             this.quotes = new ConcurrentBag<UniFeederQuote>(option.Value.TranslatesToUniFeederQuotes(twsOption.Value));
             logger = loggerFactory.CreateLogger<UniFeedConsumer>();
@@ -83,6 +81,7 @@ namespace Tws2UniFeeder
                                     catch (Exception e)
                                     {
                                         logger.LogError("client: {0} error send quote: {1}", c.Key, e.Message);
+                                        Task.Run(() => RemoveClient(c.Key, 5));
                                     }
                                 });
                                 logger.LogDebug("quote sending {0} clients", clients.Count);
@@ -160,22 +159,12 @@ namespace Tws2UniFeeder
                     },
                     onError: e =>
                     {
-                        var i = 5;
-                        while (clients.TryRemove(clientId, out IRxSocketClient client) && i > 0)
-                        {
-                            client.Dispose();
-                            i--;
-                        }
+                        RemoveClient(clientId, 5);
                         logger.LogError("client: {0} rxsocket error {1}. client disposed. current clients: {2}", clientId, e.Message, clients.Count);
                     },
                     onCompleted: () =>
                     {
-                        var i = 5;
-                        while (clients.TryRemove(clientId, out IRxSocketClient client) && i > 0)
-                        {
-                            client.Dispose();
-                            i--;
-                        }
+                        RemoveClient(clientId, 5);
                         logger.LogInformation("client: {0} rxsocket complited. client disposed. current clients: {1}", clientId, clients.Count);
                     }
                  );
@@ -201,6 +190,23 @@ namespace Tws2UniFeeder
         private bool Authentificate(UniFeederAuthorizationOption auth)
         {
             return option.Value.Authorization.Any(a => a.Equals(auth));
+        }
+
+        private bool RemoveClient(int clientId, uint tryRemoveCount = 5)
+        {
+            var i = tryRemoveCount;
+            while (i > 0)
+            {
+                if (clients.TryRemove(clientId, out IRxSocketClient client))
+                {
+                    client.Dispose();
+                    return true;
+                }
+
+                i--;
+            }
+
+            return false;
         }
     }
 
