@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Globalization;
 using System.Collections.Generic;
+using System.Linq;
+using Microsoft.Extensions.Logging;
 
 namespace Tws2UniFeeder
 {
@@ -35,7 +37,7 @@ namespace Tws2UniFeeder
             );
         }
     }
-
+    
     public class UniFeederTranslate
     {
         public string Symbol { get; set; } = string.Empty;
@@ -47,13 +49,15 @@ namespace Tws2UniFeeder
         public int Fix { get; set; } = -1;
         public int Min { get; set; } = -1;
         public int Max { get; set; } = -1;
+        public int NumberLastTicks { get; set; } = 10;
+        public int SigmaSpread { get; set; } = 0;
     }
 
     public static class UniFeederTranslateEx
     {
         public static string ToStringTranslates(this UniFeederTranslate t)
         {
-            return string.Format(CultureInfo.InvariantCulture, "Symbol:{0} Source:{1} Digits:{2} BidMarkup:{3} AskMarkup:{4} Percent:{5} Fix:{6} Min:{7} Max:{8}", t.Symbol, t.Source, t.Digits, t.BidMarkup, t.AskMarkup, t.Percent, t.Fix, t.Min, t.Max);
+            return string.Format(CultureInfo.InvariantCulture, "Symbol:{0} Source:{1} Digits:{2} BidMarkup:{3} AskMarkup:{4} Percent:{5} Fix:{6} Min:{7} Max:{8} NumberLastTicks:{9} SigmaSpread:{10}", t.Symbol, t.Source, t.Digits, t.BidMarkup, t.AskMarkup, t.Percent, t.Fix, t.Min, t.Max, t.NumberLastTicks, t.SigmaSpread);
         }
     }
 
@@ -62,77 +66,111 @@ namespace Tws2UniFeeder
         public double LastBid { get; set; }
         public double LastAsk { get; set; }
         public Quote LastTick { get; set; } = new Quote();
+        public FixedSizedQueue<Quote> LastTicks { get; set; } = new FixedSizedQueue<Quote>();
         public bool Change { get; private set; } = false;
 
-        public void SetQuote(Quote quote)
+        public void SetQuote(Quote quote, ILogger logger = null)
         {
             if (quote.IsValidQuote())
             {
                 if (!LastTick.QuoteEqual(quote))
                 {
-                    double last_bid = quote.Bid;
-                    double last_ask = quote.Ask;
-                    double point = Math.Pow(10, -Digits);
-                    double contract = Math.Pow(10, Digits);
+                    bool filtered = false;
 
-                    if (BidMarkup != 0)
+                    // фильтр расширения спреда по сигмам. Сравнивается исходный спред
+                    if (SigmaSpread != 0)
                     {
-                        last_bid += point * BidMarkup;
-                    }
-
-                    if (AskMarkup != 0)
-                    {
-                        last_ask += point * AskMarkup;
-                    }
-
-                    if (Percent != 0)
-                    {
-                        double pointModify = (last_ask - last_bid) * Percent / 100 / 2;
-                        last_bid -= pointModify;
-                        last_ask += pointModify;
-                    }
-
-                    if (Min != -1)
-                    {
-                        double spread = (last_ask - last_bid) * contract;
-                        if (spread < Min)
+                        if(LastTicks.Size != NumberLastTicks)
                         {
-                            double last_mid = (last_ask + last_bid) / 2;
-                            last_bid = last_mid - (Min * point / 2);
-                            last_ask = last_mid + (Min * point / 2);
+                            LastTicks.Size = NumberLastTicks;
+                        }
+
+                        if (LastTicks.Count >= NumberLastTicks)
+                        {
+                            var s = LastTicks.Sigma(quote, q => (q.Ask - q.Bid));
+                            if (s > SigmaSpread)
+                            {
+                                logger?.LogWarning("SigmaSpread. source quote: {0} was filtered out because sigma ({1} > {2}). Last source quote: {3}", quote, s, SigmaSpread, LastTicks.ToPrint());
+                                var standartDeviation = LastTicks.StandardDeviationAndAverage(q => q.Ask - q.Bid);
+                                logger?.LogWarning("SigmaSpread. Current Spread: {0:f5} ; Standart Deviation {1:f5} ; Average {2:f5} ; Sigma {3} ; Sigma in options {4} ; Spreads: {5}", quote.Ask - quote.Bid, standartDeviation.Item1, standartDeviation.Item2, s, SigmaSpread, LastTicks.ToPrintSpread());
+                                filtered = true;
+                            }
                         }
                     }
 
-                    if (Max != -1)
+                    // если котировка не отфильтрована, то делаю модификацию этой котировки
+                    if (!filtered)
                     {
-                        double spread = (last_ask - last_bid) * contract;
-                        if (spread > Max)
+                        double last_bid = quote.Bid;
+                        double last_ask = quote.Ask;
+                        double point = Math.Pow(10, -Digits);
+                        double contract = Math.Pow(10, Digits);
+
+                        if (BidMarkup != 0)
                         {
-                            double last_mid = (last_ask + last_bid) / 2;
-                            last_bid = last_mid - (Max * point / 2);
-                            last_ask = last_mid + (Max * point / 2);
+                            last_bid += point * BidMarkup;
                         }
-                    }
 
-                    if (Fix != -1)
-                    {
-                        double last_mid = (last_bid + last_ask) / 2;
-                        last_bid = last_mid - (Fix * point / 2);
-                        last_ask = last_mid + (Fix * point / 2);
-                    }
+                        if (AskMarkup != 0)
+                        {
+                            last_ask += point * AskMarkup;
+                        }
 
-                    last_bid = Math.Round(last_bid, Digits, MidpointRounding.ToEven);
-                    last_ask = Math.Round(last_ask, Digits, MidpointRounding.ToEven);
+                        if (Percent != 0)
+                        {
+                            double pointModify = (last_ask - last_bid) * Percent / 100 / 2;
+                            last_bid -= pointModify;
+                            last_ask += pointModify;
+                        }
 
-                    if (last_ask != LastAsk || last_bid != LastBid)
-                    {
-                        LastBid = last_bid;
-                        LastAsk = last_ask;
-                        Change = true;
+                        if (Min != -1)
+                        {
+                            double spread = (last_ask - last_bid) * contract;
+                            if (spread < Min)
+                            {
+                                double last_mid = (last_ask + last_bid) / 2;
+                                last_bid = last_mid - (Min * point / 2);
+                                last_ask = last_mid + (Min * point / 2);
+                            }
+                        }
+
+                        if (Max != -1)
+                        {
+                            double spread = (last_ask - last_bid) * contract;
+                            if (spread > Max)
+                            {
+                                logger?.LogWarning("Max. source quote ({0}) => ({1:f5} {2:f5} {3:f0}) but maximum in option {4}", quote, last_ask, last_bid, spread, Max);
+
+                                double last_mid = (last_ask + last_bid) / 2;
+                                last_bid = last_mid - (Max * point / 2);
+                                last_ask = last_mid + (Max * point / 2);
+
+                            }
+                        }
+
+                        if (Fix != -1)
+                        {
+                            double last_mid = (last_bid + last_ask) / 2;
+                            last_bid = last_mid - (Fix * point / 2);
+                            last_ask = last_mid + (Fix * point / 2);
+                        }
+
+                        last_bid = Math.Round(last_bid, Digits, MidpointRounding.ToEven);
+                        last_ask = Math.Round(last_ask, Digits, MidpointRounding.ToEven);
+
+                        if (last_ask != LastAsk || last_bid != LastBid)
+                        {
+                            LastBid = last_bid;
+                            LastAsk = last_ask;
+                            Change = true;
+                        }
                     }
                 }
 
                 LastTick = quote;
+
+                if (SigmaSpread != 0) 
+                    LastTicks.Enqueue(quote);
             }
         }
 
@@ -140,10 +178,17 @@ namespace Tws2UniFeeder
         {
             return string.Format(CultureInfo.InvariantCulture, "{0} {1} {2}", Symbol, LastBid, LastAsk);
         }
+    }
 
-        public override string ToString()
+    public static class UniFeederQuoteEx
+    {
+        public static string ToPrint(this IEnumerable<Quote> tiks)
         {
-            return string.Format(CultureInfo.InvariantCulture, "{0} ({1} {2})", Symbol, LastBid, LastAsk);
+            return string.Join(", ", tiks.Select(q => string.Format(CultureInfo.InvariantCulture, "{0}:{1} ({2} {3})", q.Time.ToString("HH:mm:ss.ffffff", CultureInfo.InvariantCulture), q.Symbol, q.Bid, q.Ask)));
+        }
+        public static string ToPrintSpread(this IEnumerable<Quote> tiks)
+        {
+            return string.Join(", ", tiks.Select(q => string.Format(CultureInfo.InvariantCulture, "{0:f5}", q.Ask - q.Bid)));
         }
     }
 

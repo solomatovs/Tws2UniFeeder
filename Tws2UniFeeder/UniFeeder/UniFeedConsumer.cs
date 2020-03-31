@@ -66,7 +66,7 @@ namespace Tws2UniFeeder
 
                         quotes.AsParallel().Where(q => q.Source == tick.Symbol).ForAll(q =>
                         {
-                            q.SetQuote(tick);
+                            q.SetQuote(tick, logger);
                             if (q.Change)
                             {
                                 var quoteString = q.ToUniFeederStringFormat();

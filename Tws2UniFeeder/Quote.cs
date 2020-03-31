@@ -1,9 +1,11 @@
 ﻿using System.Globalization;
+using System;
 
 namespace Tws2UniFeeder
 {
     public class Quote
     {
+        public DateTimeOffset Time { get; set; }
         public string Symbol { get; set; }
         public double Bid { get; set; }
         public double Ask { get; set; }
@@ -15,7 +17,7 @@ namespace Tws2UniFeeder
 
         public override string ToString()
         {
-            return string.Format(CultureInfo.InvariantCulture, "{0} ({1} {2})", Symbol, Bid, Ask);
+            return string.Format(CultureInfo.InvariantCulture, "{0}:{1} ({2} {3})", Time.ToString("HH:mm:ss.ffffff", CultureInfo.InvariantCulture), Symbol, Bid, Ask);
         }
     }
 
@@ -30,7 +32,9 @@ namespace Tws2UniFeeder
 
         public static bool IsValidQuote(this Quote q)
         {
-            return q.Ask > 0 && q.Bid > 0;
+            return q.Ask > 0 
+                && q.Bid > 0 
+                && q.Ask >= q.Bid;
         }
     }
 }

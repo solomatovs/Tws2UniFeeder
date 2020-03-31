@@ -146,11 +146,13 @@ namespace Tws2UniFeeder
 
                 quotes.AddOrUpdate(symbol, s => new Quote
                 {
+                    Time = DateTimeOffset.UtcNow,
                     Symbol = symbol,
                     Ask = tickType == TickType.AskPrice ? price : 0,
                     Bid = tickType == TickType.BidPrice ? price : 0
                 }, (s, q) => new Quote
                 {
+                    Time = DateTimeOffset.UtcNow,
                     Symbol = symbol,
                     Ask = tickType == TickType.AskPrice ? price : q.Ask,
                     Bid = tickType == TickType.BidPrice ? price : q.Bid
