@@ -90,9 +90,11 @@ namespace Tws2UniFeeder
                             var s = LastTicks.Sigma(quote, q => (q.Ask - q.Bid));
                             if (s > SigmaSpread)
                             {
-                                logger?.LogWarning("SigmaSpread. source quote: {0} was filtered out because sigma ({1} > {2}). Last source quote: {3}", quote, s, SigmaSpread, LastTicks.ToPrint());
+                                logger?.LogWarning("SigmaSpread. source quote: {0} was filtered out because sigma ({1} > {2})", quote, s, SigmaSpread);
                                 var standartDeviation = LastTicks.StandardDeviationAndAverage(q => q.Ask - q.Bid);
-                                logger?.LogWarning("SigmaSpread. Current Spread: {0:f5} ; Standart Deviation {1:f5} ; Average {2:f5} ; Sigma {3} ; Sigma in options {4} ; Spreads: {5}", quote.Ask - quote.Bid, standartDeviation.Item1, standartDeviation.Item2, s, SigmaSpread, LastTicks.ToPrintSpread());
+                                logger?.LogWarning("SigmaSpread. Current Spread: {0:f5} ; Standart Deviation {1:f5} ; Average {2:f5} ; Sigma {3} ; Sigma in options {4}", quote.Ask - quote.Bid, standartDeviation.Item1, standartDeviation.Item2, s, SigmaSpread);
+                                logger?.ToLogSpread(LogLevel.Warning, LastTicks);
+                                logger?.ToLogQuotes(LogLevel.Warning, LastTicks);
                                 filtered = true;
                             }
                         }
@@ -182,13 +184,19 @@ namespace Tws2UniFeeder
 
     public static class UniFeederQuoteEx
     {
-        public static string ToPrint(this IEnumerable<Quote> tiks)
+        public static void ToLogQuotes(this ILogger logger, LogLevel level, IEnumerable<Quote> tiks)
         {
-            return string.Join(", ", tiks.Select(q => string.Format(CultureInfo.InvariantCulture, "{0}:{1} ({2} {3})", q.Time.ToString("HH:mm:ss.ffffff", CultureInfo.InvariantCulture), q.Symbol, q.Bid, q.Ask)));
+            foreach(var q in tiks)
+            {
+                logger.Log(level, "{0}:{1} ({2} {3})", q.Time.ToString("HH:mm:ss.ffffff", CultureInfo.InvariantCulture), q.Symbol, q.Bid, q.Ask);
+            }
         }
-        public static string ToPrintSpread(this IEnumerable<Quote> tiks)
+        public static void ToLogSpread(this ILogger logger, LogLevel level, IEnumerable<Quote> tiks)
         {
-            return string.Join(", ", tiks.Select(q => string.Format(CultureInfo.InvariantCulture, "{0:f5}", q.Ask - q.Bid)));
+            foreach (var q in tiks)
+            {
+                logger.Log(level, "{0:f5}", q.Ask - q.Bid);
+            }
         }
     }
 
