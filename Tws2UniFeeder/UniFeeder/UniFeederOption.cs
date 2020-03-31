@@ -93,8 +93,7 @@ namespace Tws2UniFeeder
                                 logger?.LogWarning("SigmaSpread. source quote: {0} was filtered out because sigma ({1} > {2})", quote, s, SigmaSpread);
                                 var standartDeviation = LastTicks.StandardDeviationAndAverage(q => q.Ask - q.Bid);
                                 logger?.LogWarning("SigmaSpread. Current Spread: {0:f5} ; Standart Deviation {1:f5} ; Average {2:f5} ; Sigma {3} ; Sigma in options {4}", quote.Ask - quote.Bid, standartDeviation.Item1, standartDeviation.Item2, s, SigmaSpread);
-                                logger?.ToLogSpread(LogLevel.Warning, LastTicks);
-                                logger?.ToLogQuotes(LogLevel.Warning, LastTicks);
+                                logger?.ToLogQuotes(LogLevel.Warning, LastTicks, Digits);
                                 filtered = true;
                             }
                         }
@@ -184,18 +183,14 @@ namespace Tws2UniFeeder
 
     public static class UniFeederQuoteEx
     {
-        public static void ToLogQuotes(this ILogger logger, LogLevel level, IEnumerable<Quote> tiks)
+        public static void ToLogQuotes(this ILogger logger, LogLevel level, IEnumerable<Quote> tiks, int digits = 5)
         {
+            var format = string.Concat("{0} {1} {2} ({3:f", digits, "} {4:f", digits, "} {5:f", digits, "})");
+            int i = 0;
             foreach(var q in tiks)
             {
-                logger.Log(level, "{0}:{1} ({2} {3})", q.Time.ToString("HH:mm:ss.ffffff", CultureInfo.InvariantCulture), q.Symbol, q.Bid, q.Ask);
-            }
-        }
-        public static void ToLogSpread(this ILogger logger, LogLevel level, IEnumerable<Quote> tiks)
-        {
-            foreach (var q in tiks)
-            {
-                logger.Log(level, "{0:f5}", q.Ask - q.Bid);
+                logger.Log(level, format, i, q.Time.ToString("HH:mm:ss.ffffff", CultureInfo.InvariantCulture), q.Symbol, q.Ask - q.Bid, q.Bid, q.Ask);
+                i++;
             }
         }
     }
