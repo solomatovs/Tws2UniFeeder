@@ -129,8 +129,8 @@ namespace Tws2UniFeeder
 
                             if (bidSigma > SigmaStep && bidStep > bidStandartDeviation.Item2 && bidStep != 0)
                             {
-                                logger?.LogWarning("SigmaStepAsk. source quote: {0} was filtered out because sigma ({1} > {2})", quote, bidSigma, SigmaStep);
-                                logger?.LogWarning("SigmaStepAsk. Current Step: {0:f5} ; Standart Deviation {1:f5} ; Average {2:f5} ; Sigma {3} ; Sigma in options {4}", bidStep, bidStandartDeviation.Item1, bidStandartDeviation.Item2, bidSigma, SigmaStep);
+                                logger?.LogWarning("SigmaStepBid. source quote: {0} was filtered out because sigma ({1} > {2})", quote, bidSigma, SigmaStep);
+                                logger?.LogWarning("SigmaStepBid. Current Step: {0:f5} ; Standart Deviation {1:f5} ; Average {2:f5} ; Sigma {3} ; Sigma in options {4}", bidStep, bidStandartDeviation.Item1, bidStandartDeviation.Item2, bidSigma, SigmaStep);
                                 logger?.ToLogSteps(LogLevel.Warning, LastSteps, Digits);
                                 filtered = true;
                             }
@@ -205,7 +205,7 @@ namespace Tws2UniFeeder
                     }
                 }
 
-                if (SigmaStep != 0 && (LastTick.Ask != 0 && LastTick.Bid != 0))
+                if (SigmaStep != 0 && (LastTick.Ask != 0 && LastTick.Bid != 0) && (quote.Ask != LastTick.Ask && quote.Bid != LastTick.Bid))
                     LastSteps.Enqueue(new KeyValuePair<double, double>(Math.Abs(quote.Ask - LastTick.Ask), Math.Abs(quote.Bid - LastTick.Bid)));
 
                 LastTick = quote;
