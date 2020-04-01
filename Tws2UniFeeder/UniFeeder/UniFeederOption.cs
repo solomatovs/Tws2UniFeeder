@@ -50,6 +50,7 @@ namespace Tws2UniFeeder
         public int Min { get; set; } = -1;
         public int Max { get; set; } = -1;
         public int NumberLastTicks { get; set; } = 10;
+        public int NumberLastSteps { get; set; } = 5;
         public int SigmaSpread { get; set; } = 0;
         public int SigmaStep { get; set; } = 0;
     }
@@ -104,33 +105,32 @@ namespace Tws2UniFeeder
                     // фильтр шага по сигмам. Сравнивается исходный спред
                     if (SigmaStep != 0)
                     {
-                        if (LastSteps.Size != NumberLastTicks)
+                        if (LastSteps.Size != NumberLastSteps)
                         {
-                            LastSteps.Size = NumberLastTicks;
+                            LastSteps.Size = NumberLastSteps;
                         }
 
-                        if (LastSteps.Count >= NumberLastTicks)
+                        if (LastSteps.Count >= NumberLastSteps)
                         {
                             var askStep = Math.Abs(quote.Ask - LastTick.Ask);
                             var bidStep = Math.Abs(quote.Bid - LastTick.Bid);
                             var keyValue = new KeyValuePair<double, double>(askStep, bidStep);
                             var askSigma = LastSteps.Sigma(keyValue, q => q.Key);   // Ask Sigma
                             var bidSigma = LastSteps.Sigma(keyValue, q => q.Value); // Bid Sigma
-
-                            if (askSigma > SigmaStep && askStep != 0)
+                            var askStandartDeviation = LastSteps.StandardDeviationAndAverage(q => q.Key);
+                            var bidStandartDeviation = LastSteps.StandardDeviationAndAverage(q => q.Value);
+                            if (askSigma > SigmaStep && askStep > askStandartDeviation.Item2 && askStep != 0)
                             {
                                 logger?.LogWarning("SigmaStepAsk. source quote: {0} was filtered out because sigma ({1} > {2})", quote, askSigma, SigmaStep);
-                                var standartDeviation = LastSteps.StandardDeviationAndAverage(q => q.Key);
-                                logger?.LogWarning("SigmaStepAsk. Current Step: {0:f5} ; Standart Deviation {1:f5} ; Average {2:f5} ; Sigma {3} ; Sigma in options {4}", askStep, standartDeviation.Item1, standartDeviation.Item2, askSigma, SigmaStep);
+                                logger?.LogWarning("SigmaStepAsk. Current Step: {0:f5} ; Standart Deviation {1:f5} ; Average {2:f5} ; Sigma {3} ; Sigma in options {4}", askStep, askStandartDeviation.Item1, askStandartDeviation.Item2, askSigma, SigmaStep);
                                 logger?.ToLogSteps(LogLevel.Warning, LastSteps, Digits);
                                 filtered = true;
                             }
 
-                            if (bidSigma > SigmaStep && bidStep != 0)
+                            if (bidSigma > SigmaStep && bidStep > bidStandartDeviation.Item2 && bidStep != 0)
                             {
                                 logger?.LogWarning("SigmaStepAsk. source quote: {0} was filtered out because sigma ({1} > {2})", quote, bidSigma, SigmaStep);
-                                var standartDeviation = LastSteps.StandardDeviationAndAverage(q => q.Value);
-                                logger?.LogWarning("SigmaStepAsk. Current Step: {0:f5} ; Standart Deviation {1:f5} ; Average {2:f5} ; Sigma {3} ; Sigma in options {4}", bidStep, standartDeviation.Item1, standartDeviation.Item2, bidSigma, SigmaStep);
+                                logger?.LogWarning("SigmaStepAsk. Current Step: {0:f5} ; Standart Deviation {1:f5} ; Average {2:f5} ; Sigma {3} ; Sigma in options {4}", bidStep, bidStandartDeviation.Item1, bidStandartDeviation.Item2, bidSigma, SigmaStep);
                                 logger?.ToLogSteps(LogLevel.Warning, LastSteps, Digits);
                                 filtered = true;
                             }
