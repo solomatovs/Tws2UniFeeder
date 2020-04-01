@@ -51,6 +51,7 @@ namespace Tws2UniFeeder
         public int Max { get; set; } = -1;
         public int NumberLastTicks { get; set; } = 10;
         public int SigmaSpread { get; set; } = 0;
+        public int SigmaStep { get; set; } = 0;
     }
 
     public static class UniFeederTranslateEx
@@ -87,6 +88,28 @@ namespace Tws2UniFeeder
 
                         if (LastTicks.Count >= NumberLastTicks)
                         {
+                            var s = LastTicks.Sigma(quote, q => (q.Ask - q.Bid));
+                            if (s > SigmaSpread)
+                            {
+                                logger?.LogWarning("SigmaSpread. source quote: {0} was filtered out because sigma ({1} > {2})", quote, s, SigmaSpread);
+                                var standartDeviation = LastTicks.StandardDeviationAndAverage(q => q.Ask - q.Bid);
+                                logger?.LogWarning("SigmaSpread. Current Spread: {0:f5} ; Standart Deviation {1:f5} ; Average {2:f5} ; Sigma {3} ; Sigma in options {4}", quote.Ask - quote.Bid, standartDeviation.Item1, standartDeviation.Item2, s, SigmaSpread);
+                                logger?.ToLogQuotes(LogLevel.Warning, LastTicks, Digits);
+                                filtered = true;
+                            }
+                        }
+                    }
+
+                    if (SigmaStep != 0)
+                    {
+                        if (LastTicks.Size != NumberLastTicks)
+                        {
+                            LastTicks.Size = NumberLastTicks;
+                        }
+
+                        if (LastTicks.Count >= NumberLastTicks)
+                        {
+
                             var s = LastTicks.Sigma(quote, q => (q.Ask - q.Bid));
                             if (s > SigmaSpread)
                             {
