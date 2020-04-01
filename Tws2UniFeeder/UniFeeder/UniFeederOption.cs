@@ -58,7 +58,7 @@ namespace Tws2UniFeeder
     {
         public static string ToStringTranslates(this UniFeederTranslate t)
         {
-            return string.Format(CultureInfo.InvariantCulture, "Symbol:{0} Source:{1} Digits:{2} BidMarkup:{3} AskMarkup:{4} Percent:{5} Fix:{6} Min:{7} Max:{8} NumberLastTicks:{9} SigmaSpread:{10}", t.Symbol, t.Source, t.Digits, t.BidMarkup, t.AskMarkup, t.Percent, t.Fix, t.Min, t.Max, t.NumberLastTicks, t.SigmaSpread);
+            return string.Format(CultureInfo.InvariantCulture, "Symbol:{0} Source:{1} Digits:{2} BidMarkup:{3} AskMarkup:{4} Percent:{5} Fix:{6} Min:{7} Max:{8} NumberLastTicks:{9} SigmaSpread:{10} SigmaStep: {11}", t.Symbol, t.Source, t.Digits, t.BidMarkup, t.AskMarkup, t.Percent, t.Fix, t.Min, t.Max, t.NumberLastTicks, t.SigmaSpread, t.SigmaStep);
         }
     }
 
@@ -68,6 +68,7 @@ namespace Tws2UniFeeder
         public double LastAsk { get; set; }
         public Quote LastTick { get; set; } = new Quote();
         public FixedSizedQueue<Quote> LastTicks { get; set; } = new FixedSizedQueue<Quote>();
+        public FixedSizedQueue<KeyValuePair<double, double>> LastSteps { get; set; } = new FixedSizedQueue<KeyValuePair<double, double>>();
         public bool Change { get; private set; } = false;
 
         public void SetQuote(Quote quote, ILogger logger = null)
@@ -100,23 +101,37 @@ namespace Tws2UniFeeder
                         }
                     }
 
+                    // фильтр шага по сигмам. Сравнивается исходный спред
                     if (SigmaStep != 0)
                     {
-                        if (LastTicks.Size != NumberLastTicks)
+                        if (LastSteps.Size != NumberLastTicks)
                         {
-                            LastTicks.Size = NumberLastTicks;
+                            LastSteps.Size = NumberLastTicks;
                         }
 
-                        if (LastTicks.Count >= NumberLastTicks)
+                        if (LastSteps.Count >= NumberLastTicks)
                         {
+                            var askStep = Math.Abs(quote.Ask - LastTick.Ask);
+                            var bidStep = Math.Abs(quote.Bid - LastTick.Bid);
+                            var keyValue = new KeyValuePair<double, double>(askStep, bidStep);
+                            var askSigma = LastSteps.Sigma(keyValue, q => q.Key);   // Ask Sigma
+                            var bidSigma = LastSteps.Sigma(keyValue, q => q.Value); // Bid Sigma
 
-                            var s = LastTicks.Sigma(quote, q => (q.Ask - q.Bid));
-                            if (s > SigmaSpread)
+                            if (askSigma > SigmaStep && askStep != 0)
                             {
-                                logger?.LogWarning("SigmaSpread. source quote: {0} was filtered out because sigma ({1} > {2})", quote, s, SigmaSpread);
-                                var standartDeviation = LastTicks.StandardDeviationAndAverage(q => q.Ask - q.Bid);
-                                logger?.LogWarning("SigmaSpread. Current Spread: {0:f5} ; Standart Deviation {1:f5} ; Average {2:f5} ; Sigma {3} ; Sigma in options {4}", quote.Ask - quote.Bid, standartDeviation.Item1, standartDeviation.Item2, s, SigmaSpread);
-                                logger?.ToLogQuotes(LogLevel.Warning, LastTicks, Digits);
+                                logger?.LogWarning("SigmaStepAsk. source quote: {0} was filtered out because sigma ({1} > {2})", quote, askSigma, SigmaStep);
+                                var standartDeviation = LastSteps.StandardDeviationAndAverage(q => q.Key);
+                                logger?.LogWarning("SigmaStepAsk. Current Step: {0:f5} ; Standart Deviation {1:f5} ; Average {2:f5} ; Sigma {3} ; Sigma in options {4}", askStep, standartDeviation.Item1, standartDeviation.Item2, askSigma, SigmaStep);
+                                logger?.ToLogSteps(LogLevel.Warning, LastSteps, Digits);
+                                filtered = true;
+                            }
+
+                            if (bidSigma > SigmaStep && bidStep != 0)
+                            {
+                                logger?.LogWarning("SigmaStepAsk. source quote: {0} was filtered out because sigma ({1} > {2})", quote, bidSigma, SigmaStep);
+                                var standartDeviation = LastSteps.StandardDeviationAndAverage(q => q.Value);
+                                logger?.LogWarning("SigmaStepAsk. Current Step: {0:f5} ; Standart Deviation {1:f5} ; Average {2:f5} ; Sigma {3} ; Sigma in options {4}", bidStep, standartDeviation.Item1, standartDeviation.Item2, bidSigma, SigmaStep);
+                                logger?.ToLogSteps(LogLevel.Warning, LastSteps, Digits);
                                 filtered = true;
                             }
                         }
@@ -168,7 +183,6 @@ namespace Tws2UniFeeder
                                 double last_mid = (last_ask + last_bid) / 2;
                                 last_bid = last_mid - (Max * point / 2);
                                 last_ask = last_mid + (Max * point / 2);
-
                             }
                         }
 
@@ -190,6 +204,9 @@ namespace Tws2UniFeeder
                         }
                     }
                 }
+
+                if (SigmaStep != 0 && (LastTick.Ask != 0 && LastTick.Bid != 0))
+                    LastSteps.Enqueue(new KeyValuePair<double, double>(Math.Abs(quote.Ask - LastTick.Ask), Math.Abs(quote.Bid - LastTick.Bid)));
 
                 LastTick = quote;
 
@@ -213,6 +230,16 @@ namespace Tws2UniFeeder
             foreach(var q in tiks)
             {
                 logger.Log(level, format, i, q.Time.ToString("HH:mm:ss.ffffff", CultureInfo.InvariantCulture), q.Symbol, q.Ask - q.Bid, q.Bid, q.Ask);
+                i++;
+            }
+        }
+        public static void ToLogSteps(this ILogger logger, LogLevel level, IEnumerable<KeyValuePair<double, double>> tiks, int digits = 5)
+        {
+            var format = string.Concat("{0} ask step: {1:f", digits, "} bid step: {2:f", digits, "}");
+            int i = 0;
+            foreach (var q in tiks)
+            {
+                logger.Log(level, format, i, q.Key, q.Value);
                 i++;
             }
         }

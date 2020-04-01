@@ -77,17 +77,5 @@ namespace Tws2UniFeeder
             double SD = N == 0 ? 0 : Math.Sqrt(sum / N);
             return (int)Math.Truncate(Math.Abs(selector(element) - average) / SD) + 1;
         }
-
-        //public static IEnumerable<KeyValuePair<T, T>> CrossJoin<T>(this IEnumerable<T> enumerable, Func<T, double> selector)
-        //{
-        //    int i = 0;
-        //    foreach (var l in LastTicks)
-        //    {
-        //        foreach (var r in LastTicks)
-        //        {
-
-        //        }
-        //    }
-        //}
     }
 }
