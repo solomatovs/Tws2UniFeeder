@@ -1,0 +1,124 @@
+﻿{
+  "Serilog": {
+    "Using": [ "Serilog.Sinks.ColoredConsole", "Serilog.Sinks.File", "Serilog.Filters.Expressions" ],
+    "MinimumLevel": "Debug",
+    "WriteTo": [
+      {
+        "Name": "Console",
+        "Args": {
+          "outputTemplate": "{Timestamp:HH:mm:ss.ffffff}; {Message}{NewLine}",
+          "restrictedToMinimumLevel": "Information"
+        }
+      },
+      {
+        "Name": "Async",
+        "Args": {
+          "configure": [
+            {
+              "Name": "RollingFile",
+              "Args": {
+                "pathFormat": "logs\\{Date}-app.txt",
+                "outputTemplate": "{Timestamp:HH:mm:ss.ffffff}; {Message}{NewLine}",
+                "restrictedToMinimumLevel": "Information"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "Name": "Logger",
+        "Args": {
+          "configureLogger": {
+            "Filter": [
+              {
+                "Name": "ByIncludingOnly",
+                "Args": {
+                  "expression": "event_type in ['raw']"
+                }
+              }
+            ],
+            "WriteTo": [
+              {
+                "Name": "Async",
+                "Args": {
+                  "configure": [
+                    {
+                      "Name": "RollingFile",
+                      "Args": {
+                        "pathFormat": "logs\\quotes\\{Hour}-raw.txt",
+                        "outputTemplate": "{Timestamp:HH:mm:ss.ffffff}; {Message}{NewLine}"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "Name": "Logger",
+        "Args": {
+          "configureLogger": {
+            "Filter": [
+              {
+                "Name": "ByIncludingOnly",
+                "Args": {
+                  "expression": "event_type = 'translate'"
+                }
+              }
+            ],
+            "WriteTo": [
+              {
+                "Name": "Async",
+                "Args": {
+                  "configure": [
+                    {
+                      "Name": "RollingFile",
+                      "Args": {
+                        "pathFormat": "logs\\quotes\\{Hour}-translate.txt",
+                        "outputTemplate": "{Timestamp:HH:mm:ss.ffffff}; {Message}{NewLine}"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "Name": "Logger",
+        "Args": {
+          "configureLogger": {
+            "Filter": [
+              {
+                "Name": "ByIncludingOnly",
+                "Args": {
+                  "expression": "event_type = 'stopwatch'"
+                }
+              }
+            ],
+            "WriteTo": [
+              {
+                "Name": "Async",
+                "Args": {
+                  "configure": [
+                    {
+                      "Name": "RollingFile",
+                      "Args": {
+                        "pathFormat": "logs\\quotes\\{Hour}-stopwatch.txt",
+                        "outputTemplate": "{Timestamp:HH:mm:ss.ffffff}; {Message}{NewLine}"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "Enrich": [ "FromLogContext", "WithMachineName", "WithProcessId", "WithThreadId" ]
+  }
+}

@@ -21,6 +21,7 @@ namespace Tws2UniFeeder
                     config.SetBasePath(Directory.GetCurrentDirectory());
                     config.AddEnvironmentVariables();
                     config.AddJsonFile("appsettings.json",      optional: true, reloadOnChange: true);
+                    config.AddJsonFile("log.json", optional: true, reloadOnChange: true);
                     config.AddJsonFile("appsettings.dev.json",  optional: true, reloadOnChange: true);
                     config.AddCommandLine(args);
                 })

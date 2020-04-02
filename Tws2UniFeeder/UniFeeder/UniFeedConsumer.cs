@@ -2,10 +2,10 @@
 using System.Net;
 using System.Threading;
 using System.Linq;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using System.Collections.Concurrent;
 using System.Globalization;
-using System.Collections.Generic;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -19,10 +19,12 @@ namespace Tws2UniFeeder
     {
         private readonly IOptions<UniFeederOption> option;
         private readonly ILogger logger;
+        private readonly ILogger loggerQuotes;
         private readonly IBackground<Quote> queue;
         private IRxSocketServer server;
         private readonly ConcurrentBag<UniFeederQuote> quotes;
         private readonly ConcurrentDictionary<int, IRxSocketClient> clients;
+        private readonly Stopwatch timer;
 
         public UniFeedConsumer(IOptions<UniFeederOption> option, IOptions<TwsOption> twsOption, IBackground<Quote> queue, ILoggerFactory loggerFactory)
         {
@@ -30,7 +32,9 @@ namespace Tws2UniFeeder
             this.queue = queue;
             this.clients = new ConcurrentDictionary<int, IRxSocketClient>();
             this.quotes = new ConcurrentBag<UniFeederQuote>(option.Value.TranslatesToUniFeederQuotes(twsOption.Value));
+            this.timer = new Stopwatch();
             logger = loggerFactory.CreateLogger<UniFeedConsumer>();
+            loggerQuotes = loggerFactory.CreateLogger("quotes");
         }
 
         protected async override Task ExecuteAsync(CancellationToken cancellationToken)
@@ -62,17 +66,23 @@ namespace Tws2UniFeeder
                     try
                     {
                         var tick = queue.DequeueAsync(token).Result;
-                        logger.LogDebug("receive quote: {0}", tick);
+                        timer.Restart();
+                        loggerQuotes.LogDebug("{@Timestamp:HH:mm:ss.ffffff}; {@symbol}; {@ask:f5}; {@bid:f5}; {@spread:f5}; {@event_type}", tick.Time, tick.Symbol, tick.Ask, tick.Bid, (tick.Ask - tick.Bid), "raw");
 
                         quotes.AsParallel().Where(q => q.Source == tick.Symbol).ForAll(q =>
                         {
+                            var setMs = timer.ElapsedTicks;
                             q.SetQuote(tick, logger);
+                            setMs = timer.ElapsedTicks - setMs;
+
                             if (q.Change)
                             {
-                                var quoteString = q.ToUniFeederStringFormat();
-                                logger.LogDebug("receive ({0} {1} {2}) => ({3} {4} {5}) use translate: {6}", tick.Symbol, tick.Bid, tick.Ask, q.Symbol, q.LastBid, q.LastAsk, q.ToStringTranslates());
-                                var quoteUniFeederFormat = quoteString.ToUniFeederByteArray();
-                                clients.AsParallel().ForAll(c =>
+                                var uniStringMs = timer.ElapsedTicks;
+                                var quoteUniFeederFormat = q.ToUniFeederStringFormat().ToUniFeederByteArray();
+                                uniStringMs = timer.ElapsedTicks - uniStringMs;
+
+                                var sendMs = timer.ElapsedTicks;
+                                foreach (var c in clients)
                                 {
                                     try
                                     {
@@ -83,12 +93,11 @@ namespace Tws2UniFeeder
                                         logger.LogError("client: {0} error send quote: {1}", c.Key, e.Message);
                                         Task.Run(() => RemoveClient(c.Key, 5));
                                     }
-                                });
-                                logger.LogDebug("quote sending {0} clients", clients.Count);
-                            }
-                            else
-                            {
-                                logger.LogDebug("quote not changed therefore it is not sent by the client");
+                                }
+                                sendMs = timer.ElapsedTicks - sendMs;
+
+                                loggerQuotes.LogDebug("{@Timestamp:HH:mm:ss.ffffff}; {@symbol}; {@ask:f5}; {@bid:f5}; {@spread:f5}; {@event_type}", tick.Time, q.Symbol, q.LastAsk, q.LastBid, (q.LastAsk - q.LastBid), "translate");
+                                loggerQuotes.LogDebug("{@Timestamp:HH:mm:ss.ffffff}; {@stopwatch}; {@event_type}", tick.Time, new { translate=setMs, build_unifeeder=uniStringMs, send_quotes=sendMs, count_clients=clients.Count }, "stopwatch");
                             }
                         });
                     }
